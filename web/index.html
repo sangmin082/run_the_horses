@@ -10,7 +10,7 @@
   </header>
 
   <div class="status">
-    <div class="score">
+    <div id="score" class="score">
       <span class="dot d1" aria-hidden="true"></span>
       <span id="pips-1" class="pips" aria-label="밤색 말 라운드 승수">
         <span class="pip"></span><span class="pip"></span>
@@ -20,6 +20,14 @@
         <span class="pip"></span><span class="pip"></span>
       </span>
       <span class="dot d2" aria-hidden="true"></span>
+    </div>
+    <div id="puzzle-bar" class="puzzle-bar" style="display: none">
+      <button id="puzzle-prev" type="button" aria-label="이전 퍼즐">◀</button>
+      <div class="puzzle-info">
+        <strong id="puzzle-label"></strong>
+        <span id="puzzle-goal"></span>
+      </div>
+      <button id="puzzle-next" type="button" aria-label="다음 퍼즐">▶</button>
     </div>
     <span id="turn-chip" class="turn-chip"></span>
   </div>
@@ -39,13 +47,17 @@
     <select id="mode" aria-label="게임 모드">
       <option value="ai" selected>AI 대전</option>
       <option value="2p">2인 대전</option>
+      <option value="puzzle">퍼즐</option>
     </select>
     <select id="difficulty" aria-label="AI 난이도">
       <option value="easy">쉬움</option>
       <option value="normal" selected>보통</option>
       <option value="hard">어려움</option>
+      <option value="expert">전문가</option>
     </select>
+    <button id="undo" type="button">무르기</button>
     <span class="spacer"></span>
+    <button id="sound" type="button" aria-label="소리 끄기">🔊</button>
     <button id="new-match" class="primary" type="button">새 매치</button>
   </div>
 

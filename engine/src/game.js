@@ -1,6 +1,6 @@
 // 말 달리자 — 매치 상태머신 (3라운드, 2선승, 라운드별 선공 교대)
 import { P1, P2, initialBoard, opponent } from './board.js';
-import { legalMoves, applyMove, isWinningMove } from './rules.js';
+import { legalMoves, applyMove, undoMove, isWinningMove } from './rules.js';
 
 export const MAX_ROUNDS = 3;
 export const WINS_NEEDED = 2;
@@ -46,6 +46,22 @@ export class Match {
 
     this.turn = opponent(this.turn);
     return { roundOver: false, matchOver: false, winner: null };
+  }
+
+  // 현재 라운드의 마지막 수를 무른다. 라운드 경계는 넘지 못한다.
+  // 되돌렸으면 true, 무를 수가 없으면 false.
+  undo() {
+    if (this.history.length === 0) return false;
+    const last = this.history.pop();
+    undoMove(this.board, last);
+    if (this.roundWinner === last.player) {
+      // 승리 수를 무르는 경우: 라운드/매치 결과도 되돌린다
+      this.roundWins[last.player] -= 1;
+      this.roundWinner = null;
+      this.matchWinner = null;
+    }
+    this.turn = last.player;
+    return true;
   }
 
   // 라운드 종료 후 다음 라운드로 진행 (매치가 끝나지 않았을 때만)

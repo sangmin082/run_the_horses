@@ -10,15 +10,16 @@
 ```
 engine/src/   룰 엔진 + AI (의존성 없는 순수 JS, ESM) — 이후 Dart/네이티브 포팅의 기준 구현
 engine/test/  단위 테스트 (node:test)
-tools/        선공 승률 시뮬레이션, 웹 번들 빌드
-web/          플레이 가능한 웹 프로토타입 (AI 대전 / 2인 대전)
+tools/        밸런스 시뮬레이션, 퍼즐 생성기, 웹 번들 빌드
+web/          플레이 가능한 웹 프로토타입 (AI 대전 / 2인 대전 / 퍼즐)
 ```
 
 ## 실행
 
 ```bash
-npm test                     # 룰 엔진 단위 테스트 (22개)
-npm run simulate             # 선공 밸런스 시뮬레이션 (게임수/깊이/시드 인자 지원)
+npm test                     # 룰 엔진 단위 테스트 (30개)
+npm run simulate             # 선공 밸런스 시뮬레이션: [게임수] [깊이|t밀리초] [시드] [none|pie]
+node tools/gen-puzzles.js    # 자가대전에서 퍼즐 추출 → web/puzzles.js
 npm run build:web            # web/dist/index.html 단일 파일 번들 생성
 npx http-server web          # 개발용 로컬 서버 (또는 web/dist/index.html을 바로 열기)
 ```

@@ -147,6 +147,36 @@ h1 {
 .pip.won-1 { background: var(--p1); border-color: var(--p1); }
 .pip.won-2 { background: var(--p2); border-color: var(--p2-ink); }
 
+.puzzle-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.puzzle-bar button {
+  padding: 4px 8px;
+  font-size: 0.8rem;
+}
+
+.puzzle-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: 0.85rem;
+  line-height: 1.3;
+}
+
+.puzzle-info span {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 .turn-chip {
   display: inline-flex;
   align-items: center;

@@ -18,6 +18,7 @@ const engineCode = engineFiles
   .map((f) => `// ===== engine/src/${f} =====\n${stripEsm(readFileSync(join(root, 'engine/src', f), 'utf8'))}`)
   .join('\n');
 
+const puzzlesCode = stripEsm(readFileSync(join(root, 'web/puzzles.js'), 'utf8'));
 const appCode = stripEsm(readFileSync(join(root, 'web/app.js'), 'utf8'));
 const css = readFileSync(join(root, 'web/style.css'), 'utf8');
 const html = readFileSync(join(root, 'web/index.html'), 'utf8');
@@ -26,7 +27,7 @@ const bundled = html
   .replace('<link rel="stylesheet" href="style.css">', `<style>\n${css}</style>`)
   .replace(
     '<script type="module" src="app.js"></script>',
-    `<script>\n"use strict";\n${engineCode}\n// ===== web/app.js =====\n${appCode}</script>`,
+    `<script>\n"use strict";\n${engineCode}\n// ===== web/puzzles.js =====\n${puzzlesCode}\n// ===== web/app.js =====\n${appCode}</script>`,
   );
 
 if (bundled.includes('style.css') || bundled.includes('app.js"')) {

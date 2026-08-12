@@ -151,6 +151,36 @@ h1 {
 .pip.won-1 { background: var(--p1); border-color: var(--p1); }
 .pip.won-2 { background: var(--p2); border-color: var(--p2-ink); }
 
+.puzzle-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.puzzle-bar button {
+  padding: 4px 8px;
+  font-size: 0.8rem;
+}
+
+.puzzle-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: 0.85rem;
+  line-height: 1.3;
+}
+
+.puzzle-info span {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 .turn-chip {
   display: inline-flex;
   align-items: center;
@@ -367,7 +397,7 @@ select:focus-visible,
   </header>
 
   <div class="status">
-    <div class="score">
+    <div id="score" class="score">
       <span class="dot d1" aria-hidden="true"></span>
       <span id="pips-1" class="pips" aria-label="밤색 말 라운드 승수">
         <span class="pip"></span><span class="pip"></span>
@@ -377,6 +407,14 @@ select:focus-visible,
         <span class="pip"></span><span class="pip"></span>
       </span>
       <span class="dot d2" aria-hidden="true"></span>
+    </div>
+    <div id="puzzle-bar" class="puzzle-bar" style="display: none">
+      <button id="puzzle-prev" type="button" aria-label="이전 퍼즐">◀</button>
+      <div class="puzzle-info">
+        <strong id="puzzle-label"></strong>
+        <span id="puzzle-goal"></span>
+      </div>
+      <button id="puzzle-next" type="button" aria-label="다음 퍼즐">▶</button>
     </div>
     <span id="turn-chip" class="turn-chip"></span>
   </div>
@@ -396,13 +434,17 @@ select:focus-visible,
     <select id="mode" aria-label="게임 모드">
       <option value="ai" selected>AI 대전</option>
       <option value="2p">2인 대전</option>
+      <option value="puzzle">퍼즐</option>
     </select>
     <select id="difficulty" aria-label="AI 난이도">
       <option value="easy">쉬움</option>
       <option value="normal" selected>보통</option>
       <option value="hard">어려움</option>
+      <option value="expert">전문가</option>
     </select>
+    <button id="undo" type="button">무르기</button>
     <span class="spacer"></span>
+    <button id="sound" type="button" aria-label="소리 끄기">🔊</button>
     <button id="new-match" class="primary" type="button">새 매치</button>
   </div>
 
@@ -620,6 +662,22 @@ class Match {
     return { roundOver: false, matchOver: false, winner: null };
   }
 
+  // 현재 라운드의 마지막 수를 무른다. 라운드 경계는 넘지 못한다.
+  // 되돌렸으면 true, 무를 수가 없으면 false.
+  undo() {
+    if (this.history.length === 0) return false;
+    const last = this.history.pop();
+    undoMove(this.board, last);
+    if (this.roundWinner === last.player) {
+      // 승리 수를 무르는 경우: 라운드/매치 결과도 되돌린다
+      this.roundWins[last.player] -= 1;
+      this.roundWinner = null;
+      this.matchWinner = null;
+    }
+    this.turn = last.player;
+    return true;
+  }
+
   // 라운드 종료 후 다음 라운드로 진행 (매치가 끝나지 않았을 때만)
   nextRound() {
     if (this.matchWinner !== null) throw new Error('매치가 이미 종료됨');
@@ -629,10 +687,12 @@ class Match {
 }
 
 // ===== engine/src/ai.js =====
-// 말 달리자 — AI (평가 함수 + 네가맥스 알파-베타)
+// 말 달리자 — AI
+// 네가맥스 + 알파-베타 + 조브리스트 해시 트랜스포지션 테이블 + 반복 심화(시간제한)
 
 
 const WIN_SCORE = 100000;
+const WIN_THRESHOLD = 90000; // 이 이상이면 승리 확정 점수로 취급 (플라이 보정 대상)
 
 // mulberry32 — 재현 가능한 시뮬레이션을 위한 시드 RNG
 function makeRng(seed) {
@@ -646,10 +706,28 @@ function makeRng(seed) {
   };
 }
 
-// 오아시스 진입 가능성 스캔.
+// --- 조브리스트 해시 (32비트, 셀×말 + 차례) ---
+const ZOBRIST = (() => {
+  const rng = makeRng(0xc0ffee);
+  const table = { [P1]: new Int32Array(CELLS), [P2]: new Int32Array(CELLS) };
+  for (const p of [P1, P2]) {
+    for (let i = 0; i < CELLS; i++) table[p][i] = (rng() * 0x100000000) | 0;
+  }
+  return table;
+})();
+const ZOBRIST_TURN = 0x5eed1234 | 0;
+
+function hashBoard(board, toMove) {
+  let h = toMove === P1 ? 0 : ZOBRIST_TURN;
+  for (let i = 0; i < CELLS; i++) {
+    if (board[i] !== EMPTY) h ^= ZOBRIST[board[i]][i];
+  }
+  return h | 0;
+}
+
+// --- 오아시스 진입 가능성 스캔 ---
 // 각 방향에서 중앙에 가장 가까운 말을 찾아, 그 말이 슬라이드로 오아시스에
 // "정확히 멈출 수 있는지"(반대편 인접 칸에 블로커 존재 + 경로 깨끗)를 판정한다.
-// wins: 즉시 승리 가능 수의 수, near: 블로커만 생기면 승리하는 잠재 위협 수
 function scanCenterLines(board) {
   const result = {
     [P1]: { wins: 0, near: 0 },
@@ -659,22 +737,18 @@ function scanCenterLines(board) {
   const dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
 
   for (const [dr, dc] of dirs) {
-    // 방향 (dr,dc) 쪽으로 스캔해 첫 말을 찾는다
     let r = cr + dr;
     let c = cc + dc;
     let piece = EMPTY;
-    while (inBounds(r, c)) {
-      const v = board[idxOf(r, c)];
+    while (r >= 0 && r < 11 && c >= 0 && c < 11) {
+      const v = board[r * 11 + c];
       if (v !== EMPTY) { piece = v; break; }
       r += dr;
       c += dc;
     }
     if (piece === EMPTY) continue;
-
     // 그 말이 중앙으로 미끄러질 때 멈춰줄 블로커: 반대편 인접 칸
-    const br = cr - dr;
-    const bc = cc - dc;
-    const blocked = inBounds(br, bc) && board[idxOf(br, bc)] !== EMPTY;
+    const blocked = board[(cr - dr) * 11 + (cc - dc)] !== EMPTY;
     if (blocked) result[piece].wins += 1;
     else result[piece].near += 1;
   }
@@ -692,11 +766,12 @@ function evaluate(board, player) {
   score += 120 * lines[player].near;
   score -= 120 * lines[opp].near;
 
-  for (let i = 0; i < board.length; i++) {
+  for (let i = 0; i < CELLS; i++) {
     const v = board[i];
     if (v === EMPTY) continue;
     const sign = v === player ? 1 : -1;
-    const [r, c] = rc(i);
+    const r = (i / 11) | 0;
+    const c = i % 11;
     const dist = Math.abs(r - 5) + Math.abs(c - 5);
     score += sign * (10 - dist) * 3; // 중앙 접근
     if (r === 5 || c === 5) score += sign * 6; // 중앙 라인 점유
@@ -704,87 +779,299 @@ function evaluate(board, player) {
   return score;
 }
 
-// 이동 정렬: 승리 수 → 중앙에 가까워지는 수 순
-function orderMoves(moves) {
-  return moves
-    .map((m) => {
-      if (isWinningMove(m)) return { m, key: 1e9 };
-      const [r, c] = rc(m.to);
-      const [fr, fc] = rc(m.from);
-      const dTo = Math.abs(r - 5) + Math.abs(c - 5);
-      const dFrom = Math.abs(fr - 5) + Math.abs(fc - 5);
-      let key = (dFrom - dTo) * 10;
-      if (r === 5 || c === 5) key += 5;
-      return { m, key };
-    })
-    .sort((a, b) => b.key - a.key)
-    .map((x) => x.m);
+// 이동 정렬 점수 (TT 최선 수는 별도로 최우선)
+function moveOrderKey(m) {
+  if (isWinningMove(m)) return 1e9;
+  const [r, c] = rc(m.to);
+  const [fr, fc] = rc(m.from);
+  const dTo = Math.abs(r - 5) + Math.abs(c - 5);
+  const dFrom = Math.abs(fr - 5) + Math.abs(fc - 5);
+  let key = (dFrom - dTo) * 10;
+  if (r === 5 || c === 5) key += 5;
+  return key;
 }
 
-// 네가맥스 + 알파-베타. toMove 관점 점수를 반환.
-function negamax(board, depth, alpha, beta, toMove, ply) {
-  const moves = legalMoves(board, toMove);
-  if (moves.length === 0) return 0; // 이동 불가 = 무승부 취급 (실전에선 거의 불가능)
+const TT_EXACT = 0;
+const TT_LOWER = 1;
+const TT_UPPER = 2;
 
-  // 즉시 승리 수가 있으면 탐색 없이 확정
-  for (const m of moves) {
-    if (isWinningMove(m)) return WIN_SCORE - ply;
-  }
-  if (depth === 0) return evaluate(board, toMove);
+class SearchTimeout extends Error {}
 
-  let best = -Infinity;
-  for (const m of orderMoves(moves)) {
-    applyMove(board, m);
-    const score = -negamax(board, depth - 1, -beta, -alpha, opponent(toMove), ply + 1);
-    undoMove(board, m);
-    if (score > best) best = score;
-    if (best > alpha) alpha = best;
-    if (alpha >= beta) break;
+// 탐색 컨텍스트: 트랜스포지션 테이블 + 시간 예산
+class Search {
+  constructor(options = {}) {
+    this.tt = new Map();
+    this.deadline = options.deadline ?? Infinity;
+    this.nodes = 0;
   }
-  return best;
+
+  checkTime() {
+    if ((this.nodes & 1023) === 0 && Date.now() > this.deadline) {
+      throw new SearchTimeout();
+    }
+  }
+
+  negamax(board, hash, depth, alpha, beta, toMove, ply) {
+    this.nodes += 1;
+    this.checkTime();
+
+    const alphaOrig = alpha;
+    const entry = this.tt.get(hash);
+    let ttMove = null;
+    if (entry) {
+      ttMove = entry.move;
+      if (entry.depth >= depth) {
+        let s = entry.score;
+        if (s > WIN_THRESHOLD) s -= ply;
+        else if (s < -WIN_THRESHOLD) s += ply;
+        if (entry.flag === TT_EXACT) return s;
+        if (entry.flag === TT_LOWER && s > alpha) alpha = s;
+        else if (entry.flag === TT_UPPER && s < beta) beta = s;
+        if (alpha >= beta) return s;
+      }
+    }
+
+    const moves = legalMoves(board, toMove);
+    if (moves.length === 0) return 0; // 이동 불가 = 무승부 취급
+
+    for (const m of moves) {
+      if (isWinningMove(m)) return WIN_SCORE - ply;
+    }
+    if (depth === 0) return evaluate(board, toMove);
+
+    // 정렬: TT 수 최우선, 나머지는 휴리스틱
+    moves.sort((a, b) => {
+      const aTt = ttMove && a.from === ttMove.from && a.to === ttMove.to ? 1 : 0;
+      const bTt = ttMove && b.from === ttMove.from && b.to === ttMove.to ? 1 : 0;
+      if (aTt !== bTt) return bTt - aTt;
+      return moveOrderKey(b) - moveOrderKey(a);
+    });
+
+    let best = -Infinity;
+    let bestMoveHere = null;
+    const piece = toMove;
+    for (const m of moves) {
+      const childHash = (hash
+        ^ ZOBRIST[piece][m.from] ^ ZOBRIST[piece][m.to] ^ ZOBRIST_TURN) | 0;
+      applyMove(board, m);
+      let score;
+      try {
+        score = -this.negamax(
+          board, childHash, depth - 1, -beta, -alpha, opponent(toMove), ply + 1,
+        );
+      } finally {
+        // 시간 초과 예외로 중단되어도 보드를 반드시 복원한다
+        undoMove(board, m);
+      }
+      if (score > best) {
+        best = score;
+        bestMoveHere = m;
+      }
+      if (best > alpha) alpha = best;
+      if (alpha >= beta) break;
+    }
+
+    // TT 저장 (승리 점수는 플라이 무관 형태로 보정해 저장)
+    let stored = best;
+    if (stored > WIN_THRESHOLD) stored += ply;
+    else if (stored < -WIN_THRESHOLD) stored -= ply;
+    const flag = best <= alphaOrig ? TT_UPPER : best >= beta ? TT_LOWER : TT_EXACT;
+    this.tt.set(hash, { depth, score: stored, flag, move: bestMoveHere });
+
+    return best;
+  }
+
+  // 루트 탐색: 각 수의 점수 목록 반환
+  rootSearch(board, player, depth) {
+    const moves = legalMoves(board, player);
+    const win = moves.find(isWinningMove);
+    if (win) return [{ m: win, score: WIN_SCORE }];
+
+    const hash = hashBoard(board, player);
+    const entry = this.tt.get(hash);
+    const ttMove = entry?.move ?? null;
+    moves.sort((a, b) => {
+      const aTt = ttMove && a.from === ttMove.from && a.to === ttMove.to ? 1 : 0;
+      const bTt = ttMove && b.from === ttMove.from && b.to === ttMove.to ? 1 : 0;
+      if (aTt !== bTt) return bTt - aTt;
+      return moveOrderKey(b) - moveOrderKey(a);
+    });
+
+    const scored = [];
+    let alpha = -Infinity;
+    for (const m of moves) {
+      const childHash = (hash
+        ^ ZOBRIST[player][m.from] ^ ZOBRIST[player][m.to] ^ ZOBRIST_TURN) | 0;
+      applyMove(board, m);
+      let score;
+      try {
+        score = -this.negamax(
+          board, childHash, depth - 1, -Infinity, -alpha, opponent(player), 1,
+        );
+      } finally {
+        // 시간 초과 예외로 중단되어도 보드를 반드시 복원한다
+        undoMove(board, m);
+      }
+      scored.push({ m, score });
+      if (score > alpha) alpha = score;
+    }
+    scored.sort((a, b) => b.score - a.score);
+    return scored;
+  }
 }
 
 // 난이도 프리셋
 const DIFFICULTY = {
   easy: { depth: 1, randomness: 3 },   // 상위 3개 수 중 무작위
   normal: { depth: 2, randomness: 1 },
-  hard: { depth: 3, randomness: 1 }, // 깊이 4는 수당 ~0.6초(Node 기준)라 모바일 웹에선 3이 상한
-
+  hard: { depth: 3, randomness: 1 },
+  expert: { timeMs: 800, maxDepth: 9, randomness: 1 }, // 반복 심화 + 시간제한
 };
 
-// 최선 수 선택. options: { depth, randomness, rng }
+// 최선 수 선택.
+// options: { depth } 고정 깊이, 또는 { timeMs, maxDepth } 반복 심화.
+//          { randomness, rng } 상위권 무작위 선택.
 function bestMove(board, player, options = {}) {
-  const depth = options.depth ?? 2;
   const randomness = options.randomness ?? 1;
   const rng = options.rng ?? Math.random;
 
   const moves = legalMoves(board, player);
   if (moves.length === 0) return null;
-
-  // 즉시 승리는 바로 선택
   const win = moves.find(isWinningMove);
   if (win) return win;
 
-  const scored = [];
-  let alpha = -Infinity;
-  for (const m of orderMoves(moves)) {
-    applyMove(board, m);
-    const score = -negamax(board, depth - 1, -Infinity, -alpha, opponent(player), 1);
-    undoMove(board, m);
-    scored.push({ m, score });
-    if (score > alpha) alpha = score;
+  let scored = null;
+  if (options.timeMs) {
+    // 반복 심화: 시간이 다 되면 마지막으로 완료한 깊이의 결과 사용
+    const search = new Search({ deadline: Date.now() + options.timeMs });
+    const maxDepth = options.maxDepth ?? 9;
+    for (let d = 1; d <= maxDepth; d++) {
+      try {
+        scored = search.rootSearch(board, player, d);
+      } catch (e) {
+        if (e instanceof SearchTimeout) break;
+        throw e;
+      }
+      if (scored[0].score > WIN_THRESHOLD) break; // 승리 라인 확정
+    }
+    if (!scored) scored = new Search().rootSearch(board, player, 1);
+  } else {
+    const depth = options.depth ?? 2;
+    scored = new Search().rootSearch(board, player, depth);
   }
-  scored.sort((a, b) => b.score - a.score);
 
-  // 동점(또는 randomness 상위권) 내에서 무작위 선택
   const pool = scored.filter(
     (s, i) => i < randomness || s.score === scored[0].score,
   );
   return pool[Math.floor(rng() * pool.length)].m;
 }
 
+// 탐색 점수 조회: player가 둘 차례일 때 최선 수의 점수 (player 관점)
+function searchScore(board, player, depth) {
+  return new Search().rootSearch(board, player, depth)[0].score;
+}
+
+// 강제승 판정: player가 plies 플라이 안에 승리를 강제할 수 있으면 승리 수를 반환
+function forcedWin(board, player, plies) {
+  const search = new Search();
+  const scored = search.rootSearch(board, player, plies);
+  if (scored[0].score > WIN_THRESHOLD) return scored[0].m;
+  return null;
+}
+
+// ===== web/puzzles.js =====
+// 자동 생성 파일 — tools/gen-puzzles.js (시드 511). 직접 수정하지 말 것.
+// board: 121글자(0=빈칸, 1=밤색 말, 2=흰 말), toMove: 둘 차례, ownMoves: 허용되는 내 수
+const PUZZLES = [
+  {
+    "id": "e1",
+    "title": "연습 1",
+    "board": "0000000000101100000010001000001000000010100000000210000002000002000000000000000000000100002002002000200000002020000000002",
+    "toMove": 2,
+    "ownMoves": 1
+  },
+  {
+    "id": "e2",
+    "title": "연습 2",
+    "board": "0000000000000000100000000001000000001211000000000122000011200001200000000202000000120000000002000000000000200000000000000",
+    "toMove": 1,
+    "ownMoves": 1
+  },
+  {
+    "id": "e3",
+    "title": "연습 3",
+    "board": "1000000000100000000110011000001000000000000000001010000002000201000000000000000020002000002000002000200000002020000000002",
+    "toMove": 2,
+    "ownMoves": 1
+  },
+  {
+    "id": "e4",
+    "title": "연습 4",
+    "board": "1000000000100000000010000000001000001020100000011200000000100001000002000000000020002000000002002000000000002020000000002",
+    "toMove": 2,
+    "ownMoves": 1
+  },
+  {
+    "id": "p1",
+    "title": "퍼즐 1",
+    "board": "0000000000101100000010001000001000000010100000000210000002000012000000000000000000002000002000002000200000002020000000002",
+    "toMove": 2,
+    "ownMoves": 2
+  },
+  {
+    "id": "p2",
+    "title": "퍼즐 2",
+    "board": "1000000000101000000010001001001000001000100000020000000000010000000000002000000020000000002002002000200000002020000000002",
+    "toMove": 1,
+    "ownMoves": 2
+  },
+  {
+    "id": "p3",
+    "title": "퍼즐 3",
+    "board": "1000000000100000000010000000001000000020100000011000000001100001000002000000000020202000000002002000000000002020000000002",
+    "toMove": 2,
+    "ownMoves": 2
+  },
+  {
+    "id": "p4",
+    "title": "퍼즐 4",
+    "board": "1000000000101000000010000001001000001000000000000010000000020000000000000000020120102000002002002000000000002020000000002",
+    "toMove": 2,
+    "ownMoves": 2
+  },
+  {
+    "id": "p5",
+    "title": "퍼즐 5",
+    "board": "1000000000101000000010001000001000001000100000020010000000100000000000002000000020000000002002002000200000002020000000002",
+    "toMove": 1,
+    "ownMoves": 2
+  },
+  {
+    "id": "p6",
+    "title": "퍼즐 6",
+    "board": "0010000000000000000000001101101000000020100000001002000002100001200000000000000022000000000002000000200000002000000000002",
+    "toMove": 2,
+    "ownMoves": 2
+  },
+  {
+    "id": "p7",
+    "title": "퍼즐 7",
+    "board": "0000000000000100000110000001001000000010000000010000000001200021000020200000000020100000000222000000000020000000000000002",
+    "toMove": 1,
+    "ownMoves": 2
+  },
+  {
+    "id": "p8",
+    "title": "퍼즐 8",
+    "board": "0000000000000000000000010001000100000021100000010001000001200012100002000020000000220000000002000000000000002020000000000",
+    "toMove": 2,
+    "ownMoves": 2
+  }
+];
+
 // ===== web/app.js =====
 // 말 달리자 — 웹 프로토타입 UI
+
 
 
 
@@ -794,27 +1081,104 @@ const piecesEl = document.getElementById('pieces');
 const turnChip = document.getElementById('turn-chip');
 const pipsEls = { [P1]: document.getElementById('pips-1'), [P2]: document.getElementById('pips-2') };
 const roundLabel = document.getElementById('round-label');
+const scoreEl = document.getElementById('score');
+const puzzleBar = document.getElementById('puzzle-bar');
+const puzzleLabel = document.getElementById('puzzle-label');
+const puzzleGoal = document.getElementById('puzzle-goal');
 const banner = document.getElementById('banner');
 const bannerText = document.getElementById('banner-text');
 const bannerBtn = document.getElementById('banner-btn');
 const modeSel = document.getElementById('mode');
 const diffSel = document.getElementById('difficulty');
 const newBtn = document.getElementById('new-match');
+const undoBtn = document.getElementById('undo');
+const soundBtn = document.getElementById('sound');
+const prevPuzzleBtn = document.getElementById('puzzle-prev');
+const nextPuzzleBtn = document.getElementById('puzzle-next');
 
 let match = new Match();
-let selected = null; // 선택된 말 인덱스
-let legal = [];      // 선택된 말의 합법수
+let selected = null;
+let legal = [];
 let lastMove = null;
 let aiTimer = null;
-let pieceEls = new Map(); // 말 인덱스(현재 위치) -> DOM. 이동 시 키 갱신.
+let pieceEls = new Map();
+
+// 퍼즐 모드 상태
+let puzzleIndex = 0;
+let puzzleHuman = P1; // 퍼즐에서 사람이 조작하는 진영
+let ownMovesUsed = 0;
 
 const HORSE = { [P1]: '♞', [P2]: '♘' };
 
+// --- 사운드 (WebAudio 미니 신스) ---
+let audioCtx = null;
+let muted = localStorage.getItem('rth-muted') === '1';
+
+function beep(freq, duration = 0.07, delay = 0, type = 'triangle', gain = 0.12) {
+  if (muted) return;
+  try {
+    audioCtx = audioCtx ?? new (window.AudioContext ?? window.webkitAudioContext)();
+    const t = audioCtx.currentTime + delay;
+    const osc = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    g.gain.setValueAtTime(gain, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + duration);
+    osc.connect(g).connect(audioCtx.destination);
+    osc.start(t);
+    osc.stop(t + duration + 0.02);
+  } catch { /* 사운드 실패는 무시 */ }
+}
+
+const sfx = {
+  slide: () => { beep(320, 0.06); beep(480, 0.06, 0.05); },
+  lmove: () => beep(560, 0.08),
+  win: () => { beep(523, 0.1); beep(659, 0.1, 0.09); beep(784, 0.18, 0.18); },
+  lose: () => { beep(330, 0.12); beep(262, 0.2, 0.11); },
+};
+
+function renderSoundBtn() {
+  soundBtn.textContent = muted ? '🔇' : '🔊';
+  soundBtn.setAttribute('aria-label', muted ? '소리 켜기' : '소리 끄기');
+}
+
+soundBtn.addEventListener('click', () => {
+  muted = !muted;
+  localStorage.setItem('rth-muted', muted ? '1' : '0');
+  renderSoundBtn();
+});
+
+// --- 퍼즐 진행 저장 ---
+function solvedSet() {
+  try {
+    return new Set(JSON.parse(localStorage.getItem('rth-solved') ?? '[]'));
+  } catch {
+    return new Set();
+  }
+}
+
+function markSolved(id) {
+  const s = solvedSet();
+  s.add(id);
+  localStorage.setItem('rth-solved', JSON.stringify([...s]));
+}
+
+// --- 모드 헬퍼 ---
+function mode() {
+  return modeSel.value;
+}
+
 function isAiTurn() {
-  return modeSel.value === 'ai'
-    && match.turn === P2
-    && match.roundWinner === null
-    && match.matchWinner === null;
+  if (match.roundWinner !== null || match.matchWinner !== null) return false;
+  if (mode() === 'ai') return match.turn === P2;
+  if (mode() === 'puzzle') return match.turn !== puzzleHuman;
+  return false;
+}
+
+function aiOptions() {
+  if (mode() === 'puzzle') return { depth: 3, randomness: 1 };
+  return DIFFICULTY[diffSel.value] ?? DIFFICULTY.normal;
 }
 
 // --- 보드 셀 생성 (한 번만) ---
@@ -840,7 +1204,6 @@ function pieceTransform(idx) {
   return `translate(${c * 100}%, ${r * 100}%)`;
 }
 
-// 라운드 시작 시 말 DOM 전체 재생성
 function buildPieces() {
   piecesEl.innerHTML = '';
   pieceEls = new Map();
@@ -859,9 +1222,7 @@ function buildPieces() {
 }
 
 function clearHints() {
-  for (const cell of cellEls) {
-    cell.classList.remove('hint', 'hint-l', 'selected');
-  }
+  for (const cell of cellEls) cell.classList.remove('hint', 'hint-l', 'selected');
 }
 
 function renderHints() {
@@ -882,25 +1243,49 @@ function renderLastMove() {
 }
 
 function renderStatus() {
-  roundLabel.textContent = `${match.roundNumber}라운드`;
-  for (const p of [P1, P2]) {
-    pipsEls[p].querySelectorAll('.pip').forEach((pip, i) => {
-      pip.classList.toggle(`won-${p}`, i < match.roundWins[p]);
-    });
+  const puzzle = mode() === 'puzzle';
+  scoreEl.style.display = puzzle ? 'none' : '';
+  puzzleBar.style.display = puzzle ? '' : 'none';
+  diffSel.style.display = puzzle ? 'none' : '';
+  undoBtn.style.display = mode() === 'puzzle' ? 'none' : '';
+
+  if (puzzle) {
+    const p = PUZZLES[puzzleIndex];
+    const check = solvedSet().has(p.id) ? ' ✓' : '';
+    puzzleLabel.textContent = `${p.title}${check} (${puzzleIndex + 1}/${PUZZLES.length})`;
+    const left = p.ownMoves - ownMovesUsed;
+    puzzleGoal.textContent = `${p.ownMoves}수 안에 오아시스 도착 — 남은 수 ${left}`;
+  } else {
+    roundLabel.textContent = `${match.roundNumber}라운드`;
+    for (const p of [P1, P2]) {
+      pipsEls[p].querySelectorAll('.pip').forEach((pip, i) => {
+        pip.classList.toggle(`won-${p}`, i < match.roundWins[p]);
+      });
+    }
   }
+
   const dot = `<span class="dot d${match.turn}"></span>`;
   if (match.matchWinner !== null || match.roundWinner !== null) {
     turnChip.innerHTML = '';
+    turnChip.style.display = 'none';
     turnChip.classList.remove('thinking');
-  } else if (isAiTurn()) {
+    undoBtn.disabled = true;
+    return;
+  }
+  turnChip.style.display = '';
+  if (isAiTurn()) {
     turnChip.classList.add('thinking');
     turnChip.innerHTML = `${dot} AI 생각 중…`;
   } else {
     turnChip.classList.remove('thinking');
     const name = match.turn === P1 ? '밤색 말' : '흰 말';
-    const who = modeSel.value === 'ai' ? '내 차례' : `${name} 차례`;
+    const who = mode() === '2p' ? `${name} 차례` : '내 차례';
     turnChip.innerHTML = `${dot} ${who}`;
   }
+
+  // 무르기 가능 여부
+  undoBtn.disabled = match.history.length === 0
+    || match.roundWinner !== null || isAiTurn();
 }
 
 function showBanner(text, btnLabel, onClick) {
@@ -915,29 +1300,41 @@ function hideBanner() {
 }
 
 function playerName(p) {
-  if (modeSel.value === 'ai') return p === P1 ? '나' : 'AI';
-  return p === P1 ? '밤색 말' : '흰 말';
+  if (mode() === '2p') return p === P1 ? '밤색 말' : '흰 말';
+  const human = mode() === 'puzzle' ? puzzleHuman : P1;
+  return p === human ? '나' : 'AI';
 }
 
-function doMove(move) {
+function movePieceEl(move) {
   const el = pieceEls.get(move.from);
-  const result = match.play(move);
-  lastMove = move;
-  selected = null;
-  legal = [];
-
-  // 애니메이션: transform만 갱신
   el.style.transform = pieceTransform(move.to);
   pieceEls.delete(move.from);
   pieceEls.set(move.to, el);
+}
 
-  renderHints();
-  renderLastMove();
-  renderStatus();
+function onRoundEnd(result) {
+  if (mode() === 'puzzle') {
+    const p = PUZZLES[puzzleIndex];
+    if (result.winner === puzzleHuman && ownMovesUsed <= p.ownMoves) {
+      markSolved(p.id);
+      sfx.win();
+      const last = puzzleIndex === PUZZLES.length - 1;
+      showBanner('🎉 퍼즐 성공!', last ? '처음부터' : '다음 퍼즐', () => {
+        puzzleIndex = last ? 0 : puzzleIndex + 1;
+        startPuzzle();
+      });
+    } else {
+      sfx.lose();
+      showBanner('상대가 먼저 도착했어요. 다시 도전!', '다시 시도', startPuzzle);
+    }
+    return;
+  }
 
   if (result.matchOver) {
+    (result.winner === P1 || mode() === '2p' ? sfx.win : sfx.lose)();
     showBanner(`🏆 ${playerName(result.winner)} 매치 승리!`, '새 매치', startMatch);
-  } else if (result.roundOver) {
+  } else {
+    (result.winner === P1 || mode() === '2p' ? sfx.win : sfx.lose)();
     showBanner(
       `${playerName(result.winner)} ${match.roundNumber}라운드 승리! (오아시스 도착)`,
       '다음 라운드',
@@ -946,9 +1343,39 @@ function doMove(move) {
         startRoundUi();
       },
     );
-  } else {
-    scheduleAi();
   }
+}
+
+function doMove(move) {
+  const mover = match.turn;
+  const result = match.play(move);
+  lastMove = move;
+  selected = null;
+  legal = [];
+
+  movePieceEl(move);
+  if (!result.roundOver) (move.kind === SLIDE ? sfx.slide : sfx.lmove)();
+
+  if (mode() === 'puzzle' && mover === puzzleHuman) ownMovesUsed += 1;
+
+  renderHints();
+  renderLastMove();
+  renderStatus();
+
+  if (result.roundOver) {
+    onRoundEnd(result);
+    return;
+  }
+
+  // 퍼즐: 허용 수를 다 썼는데 승리하지 못함 → 실패
+  if (mode() === 'puzzle' && mover === puzzleHuman
+      && ownMovesUsed >= PUZZLES[puzzleIndex].ownMoves) {
+    sfx.lose();
+    showBanner(`${PUZZLES[puzzleIndex].ownMoves}수 안에 도착하지 못했어요.`, '다시 시도', startPuzzle);
+    return;
+  }
+
+  scheduleAi();
 }
 
 function onCellClick(idx) {
@@ -957,7 +1384,6 @@ function onCellClick(idx) {
 
   const v = match.board[idx];
   if (v === match.turn) {
-    // 자기 말 선택/재선택
     selected = idx;
     legal = movesForPiece(match.board, idx);
     renderHints();
@@ -981,10 +1407,25 @@ function scheduleAi() {
   clearTimeout(aiTimer);
   aiTimer = setTimeout(() => {
     if (!isAiTurn()) return;
-    const options = DIFFICULTY[diffSel.value] ?? DIFFICULTY.normal;
-    const move = bestMove(match.board, match.turn, options);
+    const move = bestMove(match.board, match.turn, aiOptions());
     if (move) doMove(move);
   }, 350);
+}
+
+// 무르기: 내 마지막 수(그리고 그 뒤의 AI 응수)를 되돌린다
+function undo() {
+  if (isAiTurn() || match.roundWinner !== null) return;
+  const steps = mode() === '2p' ? 1 : 2;
+  for (let i = 0; i < steps; i++) {
+    if (!match.undo()) break;
+  }
+  selected = null;
+  legal = [];
+  lastMove = match.history.length > 0 ? match.history[match.history.length - 1] : null;
+  buildPieces();
+  renderHints();
+  renderLastMove();
+  renderStatus();
 }
 
 function startRoundUi() {
@@ -1005,11 +1446,39 @@ function startMatch() {
   startRoundUi();
 }
 
-newBtn.addEventListener('click', startMatch);
-modeSel.addEventListener('change', startMatch);
+function startPuzzle() {
+  clearTimeout(aiTimer);
+  const p = PUZZLES[puzzleIndex];
+  match = new Match();
+  for (let i = 0; i < match.board.length; i++) {
+    match.board[i] = Number(p.board[i]);
+  }
+  match.turn = p.toMove;
+  puzzleHuman = p.toMove;
+  ownMovesUsed = 0;
+  startRoundUi();
+}
+
+function startCurrentMode() {
+  if (mode() === 'puzzle') startPuzzle();
+  else startMatch();
+}
+
+newBtn.addEventListener('click', startCurrentMode);
+modeSel.addEventListener('change', startCurrentMode);
 diffSel.addEventListener('change', () => {
-  if (modeSel.value === 'ai') scheduleAi();
+  if (mode() === 'ai') scheduleAi();
+});
+undoBtn.addEventListener('click', undo);
+prevPuzzleBtn.addEventListener('click', () => {
+  puzzleIndex = (puzzleIndex - 1 + PUZZLES.length) % PUZZLES.length;
+  startPuzzle();
+});
+nextPuzzleBtn.addEventListener('click', () => {
+  puzzleIndex = (puzzleIndex + 1) % PUZZLES.length;
+  startPuzzle();
 });
 
-startMatch();
+renderSoundBtn();
+startCurrentMode();
 </script>
