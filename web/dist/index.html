@@ -434,6 +434,7 @@ select:focus-visible,
     <select id="mode" aria-label="게임 모드">
       <option value="ai" selected>AI 대전</option>
       <option value="2p">2인 대전</option>
+      <option value="tutorial">튜토리얼</option>
       <option value="puzzle">퍼즐</option>
     </select>
     <select id="difficulty" aria-label="AI 난이도">
@@ -1112,6 +1113,29 @@ let puzzleIndex = 0;
 let puzzleHuman = P1; // 퍼즐에서 사람이 조작하는 진영
 let ownMovesUsed = 0;
 
+// 튜토리얼 정의: 각 단계는 고정 포지션에서 특정 이동을 성공시키면 통과
+const TUTORIAL = [
+  {
+    title: '1단계 · 슬라이드',
+    text: '말은 가장자리나 다른 말에 막히기 직전까지 미끄러집니다(중간 정지 불가). k6의 말을 위로 끝까지 — a6까지 — 보내보세요.',
+    pieces: [['k6', P1]],
+    check: (m) => toNotation(m.from) === 'k6' && toNotation(m.to) === 'a6',
+  },
+  {
+    title: '2단계 · L자 이동',
+    text: '나이트처럼 점프하되 비어있는 사막 칸에만 도착할 수 있어요. 초록 초원 칸으로는 L자 이동이 안 됩니다. d5의 말로 L자 이동(◆)을 해보세요.',
+    pieces: [['d5', P1]],
+    check: (m) => m.kind !== SLIDE,
+  },
+  {
+    title: '3단계 · 오아시스 진입',
+    text: '오아시스엔 슬라이드로만 도착할 수 있고, 반대편 인접 칸에 블로커가 있어야 정확히 멈춥니다. e6의 블로커를 이용해 k6의 말을 f6에 세워보세요.',
+    pieces: [['k6', P1], ['e6', P2]],
+    check: (m) => m.to === CENTER,
+  },
+];
+let tutStep = 0;
+
 const HORSE = { [P1]: '♞', [P2]: '♘' };
 
 // --- 사운드 (WebAudio 미니 신스) ---
@@ -1177,7 +1201,7 @@ function isAiTurn() {
   if (match.roundWinner !== null || match.matchWinner !== null) return false;
   if (mode() === 'ai') return match.turn === P2;
   if (mode() === 'puzzle') return match.turn !== puzzleHuman;
-  return false;
+  return false; // 2인 대전·튜토리얼은 AI 없음
 }
 
 function aiOptions() {
@@ -1248,12 +1272,17 @@ function renderLastMove() {
 
 function renderStatus() {
   const puzzle = mode() === 'puzzle';
-  scoreEl.style.display = puzzle ? 'none' : '';
-  puzzleBar.style.display = puzzle ? '' : 'none';
-  diffSel.style.display = puzzle ? 'none' : '';
-  undoBtn.style.display = mode() === 'puzzle' ? 'none' : '';
+  const tut = mode() === 'tutorial';
+  scoreEl.style.display = puzzle || tut ? 'none' : '';
+  puzzleBar.style.display = puzzle || tut ? '' : 'none';
+  diffSel.style.display = puzzle || tut ? 'none' : '';
+  undoBtn.style.display = puzzle || tut ? 'none' : '';
 
-  if (puzzle) {
+  if (tut) {
+    const s = TUTORIAL[tutStep];
+    puzzleLabel.textContent = `${s.title} (${tutStep + 1}/${TUTORIAL.length})`;
+    puzzleGoal.textContent = s.text;
+  } else if (puzzle) {
     const p = PUZZLES[puzzleIndex];
     const check = solvedSet().has(p.id) ? ' ✓' : '';
     puzzleLabel.textContent = `${p.title}${check} (${puzzleIndex + 1}/${PUZZLES.length})`;
@@ -1366,6 +1395,11 @@ function doMove(move) {
   renderLastMove();
   renderStatus();
 
+  if (mode() === 'tutorial') {
+    onTutorialMove(move);
+    return;
+  }
+
   if (result.roundOver) {
     onRoundEnd(result);
     return;
@@ -1450,6 +1484,38 @@ function startMatch() {
   startRoundUi();
 }
 
+function onTutorialMove(move) {
+  const step = TUTORIAL[tutStep];
+  if (step.check(move)) {
+    sfx.win();
+    if (tutStep === TUTORIAL.length - 1) {
+      showBanner('🎓 튜토리얼 완료! 이제 실전이에요.', 'AI와 대전', () => {
+        modeSel.value = 'ai';
+        startMatch();
+      });
+    } else {
+      showBanner('잘했어요!', '다음 단계', () => {
+        tutStep += 1;
+        startTutorial();
+      });
+    }
+  } else {
+    sfx.lose();
+    showBanner('목표와 다르게 움직였어요. 다시 해볼까요?', '다시 시도', startTutorial);
+  }
+}
+
+function startTutorial() {
+  clearTimeout(aiTimer);
+  match = new Match();
+  match.board.fill(0);
+  for (const [pos, player] of TUTORIAL[tutStep].pieces) {
+    match.board[fromNotation(pos)] = player;
+  }
+  match.turn = P1;
+  startRoundUi();
+}
+
 function startPuzzle() {
   clearTimeout(aiTimer);
   const p = PUZZLES[puzzleIndex];
@@ -1465,6 +1531,7 @@ function startPuzzle() {
 
 function startCurrentMode() {
   if (mode() === 'puzzle') startPuzzle();
+  else if (mode() === 'tutorial') { tutStep = 0; startTutorial(); }
   else startMatch();
 }
 
@@ -1475,10 +1542,20 @@ diffSel.addEventListener('change', () => {
 });
 undoBtn.addEventListener('click', undo);
 prevPuzzleBtn.addEventListener('click', () => {
+  if (mode() === 'tutorial') {
+    tutStep = (tutStep - 1 + TUTORIAL.length) % TUTORIAL.length;
+    startTutorial();
+    return;
+  }
   puzzleIndex = (puzzleIndex - 1 + PUZZLES.length) % PUZZLES.length;
   startPuzzle();
 });
 nextPuzzleBtn.addEventListener('click', () => {
+  if (mode() === 'tutorial') {
+    tutStep = (tutStep + 1) % TUTORIAL.length;
+    startTutorial();
+    return;
+  }
   puzzleIndex = (puzzleIndex + 1) % PUZZLES.length;
   startPuzzle();
 });
