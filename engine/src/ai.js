@@ -115,6 +115,8 @@ class SearchTimeout extends Error {}
 class Search {
   constructor(options = {}) {
     this.tt = new Map();
+    // V8 Map 최대 크기(약 2^24) 초과 방지: 상한 도달 시 테이블을 비우고 계속한다
+    this.maxTtEntries = options.maxTtEntries ?? 1 << 22;
     this.deadline = options.deadline ?? Infinity;
     this.nodes = 0;
   }
@@ -190,6 +192,7 @@ class Search {
     if (stored > WIN_THRESHOLD) stored += ply;
     else if (stored < -WIN_THRESHOLD) stored -= ply;
     const flag = best <= alphaOrig ? TT_UPPER : best >= beta ? TT_LOWER : TT_EXACT;
+    if (this.tt.size >= this.maxTtEntries) this.tt.clear();
     this.tt.set(hash, { depth, score: stored, flag, move: bestMoveHere });
 
     return best;
