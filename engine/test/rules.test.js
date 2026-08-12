@@ -58,12 +58,13 @@ test('L자 이동: 나이트 오프셋, 비어있는 사막 칸만 허용', () =
 
 test('L자 이동: 초원/오아시스 칸에는 도착 불가', () => {
   const board = emptyBoard();
-  put(board, 'd5', P1); // (3,4): 나이트 도착지에 f6(오아시스), e7(초원) 포함
+  put(board, 'd5', P1); // (3,4): 나이트 도착지에 f6(오아시스), e7·f4(초원) 포함
   const lmoves = movesForPiece(board, fromNotation('d5')).filter((m) => m.kind === LMOVE);
   assert.equal(movesTo(lmoves, 'f6').length, 0); // 오아시스 도착 불가
   assert.equal(movesTo(lmoves, 'e7').length, 0); // 초원 도착 불가
-  assert.equal(movesTo(lmoves, 'f4').length, 1); // f4는 초원 밖(사막)이라 가능
+  assert.equal(movesTo(lmoves, 'f4').length, 0); // 초원 도착 불가
   assert.equal(movesTo(lmoves, 'b4').length, 1); // 사막은 가능
+  assert.equal(movesTo(lmoves, 'c3').length, 1); // 사막은 가능
 });
 
 test('L자 이동: 중간에 말이 있어도 점프한다', () => {

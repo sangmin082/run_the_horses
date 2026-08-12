@@ -10,10 +10,13 @@ test('정중앙 f6은 오아시스', () => {
   assert.equal(terrainOf(CENTER), OASIS);
 });
 
-test('오아시스 주변 8칸은 초원, 나머지는 사막', () => {
-  const meadow = ['e5', 'e6', 'e7', 'f5', 'f7', 'g5', 'g6', 'g7'];
+test('초원은 중앙 맨해튼 거리 2 이내의 12칸, 나머지는 사막', () => {
+  const meadow = ['d6', 'e5', 'e6', 'e7', 'f4', 'f5', 'f7', 'f8', 'g5', 'g6', 'g7', 'h6'];
   for (const s of meadow) assert.equal(terrainOf(fromNotation(s)), MEADOW, s);
-  for (const s of ['a1', 'f1', 'd6', 'f8', 'k11', 'h6']) {
+  let meadowCount = 0;
+  for (let i = 0; i < CELLS; i++) if (terrainOf(i) === MEADOW) meadowCount += 1;
+  assert.equal(meadowCount, 12);
+  for (const s of ['a1', 'f1', 'd5', 'e4', 'c6', 'f9', 'k11']) {
     assert.equal(terrainOf(fromNotation(s)), DESERT, s);
   }
 });

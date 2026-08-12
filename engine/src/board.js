@@ -42,21 +42,22 @@ export function fromNotation(s) {
   return idxOf(r, c);
 }
 
-// 칸 종류 조회
+// 칸 종류 조회 — 초원은 중앙에서 맨해튼 거리 2 이내의 12칸 다이아몬드.
+// (팬게임 horse-run-game 소스와 교차 검증. docs/competitor-analysis.md 참고)
 export function terrainOf(idx) {
   if (idx === CENTER) return OASIS;
   const [r, c] = rc(idx);
-  if (Math.abs(r - 5) <= 1 && Math.abs(c - 5) <= 1) return MEADOW;
+  if (Math.abs(r - 5) + Math.abs(c - 5) <= 2) return MEADOW;
   return DESERT;
 }
 
-// 초기 배치 — 원작 서술("각 대각선 위치에서 마주보는 형태로 5개씩")의 해석.
-// 두 대각선 위에 각 플레이어가 5개씩, 서로 마주보게 배치한다.
-// P1(북측): 좌상단 주대각선 5 + 우상단 반대각선 5
-// P2(남측): 우하단 주대각선 5 + 좌하단 반대각선 5
-// ⚠️ 원작 영상 확인 후 좌표가 다르면 이 상수만 수정하면 된다.
-export const INITIAL_P1 = ['a1', 'b2', 'c3', 'd4', 'e5', 'a11', 'b10', 'c9', 'd8', 'e7'];
-export const INITIAL_P2 = ['k11', 'j10', 'i9', 'h8', 'g7', 'k1', 'j2', 'i3', 'h4', 'g5'];
+// 초기 배치 — 각 플레이어가 대각 방향으로 마주보는 두 코너에 ㄱ자(브래킷)
+// 형태로 5개씩 배치한다. (위키 서술 "각 대각선 위치에서 마주보는 형태로 5개씩"과
+// 부합하며, 팬게임 horse-run-game의 배치와 동일. 최종 확정은 원작 영상 대조로.)
+// P1(선공): 좌상 코너 + 우하 코너
+// P2(후공): 우상 코너 + 좌하 코너
+export const INITIAL_P1 = ['a1', 'a2', 'a3', 'b1', 'c1', 'i11', 'j11', 'k11', 'k10', 'k9'];
+export const INITIAL_P2 = ['a9', 'a10', 'a11', 'b11', 'c11', 'i1', 'j1', 'k1', 'k2', 'k3'];
 
 // 새 라운드용 보드 배열 생성
 export function initialBoard() {
