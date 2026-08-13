@@ -125,39 +125,116 @@ struct GameView: View {
     }
 
     // MARK: 보드
+    // 그리드는 VStack/HStack 균등 분할로 스스로 정확히 11×11을 이루고,
+    // 말·선택·이동 표시는 오버레이에서 절대좌표(position)로 얹는다.
+    // (GeometryReader 크기 계산이 어긋나 보드가 잘려 보이던 문제의 근본 수정)
 
     private var board: some View {
-        GeometryReader { proxy in
-            let side = min(proxy.size.width, proxy.size.height)
-            let cell = side / CGFloat(GameEngine.boardSize)
-            ZStack(alignment: .topLeading) {
-                ForEach(0..<GameEngine.cellCount, id: \.self) { index in
-                    cellView(index, size: cell)
-                        .frame(width: cell, height: cell)
-                        .offset(x: CGFloat(index % GameEngine.boardSize) * cell,
-                                y: CGFloat(index / GameEngine.boardSize) * cell)
-                        .onTapGesture { viewModel.tapCell(index) }
+        VStack(spacing: 0) {
+            ForEach(0..<GameEngine.boardSize, id: \.self) { r in
+                HStack(spacing: 0) {
+                    ForEach(0..<GameEngine.boardSize, id: \.self) { c in
+                        cellBase(r * GameEngine.boardSize + c)
+                    }
                 }
+            }
+        }
+        .aspectRatio(1, contentMode: .fit)
+        .overlay(dynamicLayer)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .padding(8)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Theme.bgRaised)
+                .shadow(color: .black.opacity(0.45), radius: 20, y: 10)
+        )
+    }
+
+    private func cellBase(_ index: Int) -> some View {
+        let terrain = GameEngine.terrain(at: index)
+        let r = index / GameEngine.boardSize
+        let c = index % GameEngine.boardSize
+        let base: Color = switch terrain {
+        case .oasis: Theme.oasisDeep
+        case .meadow: Theme.meadow
+        case .desert: (r + c) % 2 == 0 ? Theme.desert : Theme.desertAlt
+        }
+        return Rectangle()
+            .fill(base)
+            .overlay(Rectangle().stroke(Theme.cellLine, lineWidth: 0.5))
+            .contentShape(Rectangle())
+            .onTapGesture { viewModel.tapCell(index) }
+    }
+
+    /// index 칸의 중심 좌표
+    private func center(of index: Int, cell: CGFloat) -> CGPoint {
+        CGPoint(x: (CGFloat(index % GameEngine.boardSize) + 0.5) * cell,
+                y: (CGFloat(index / GameEngine.boardSize) + 0.5) * cell)
+    }
+
+    private var dynamicLayer: some View {
+        GeometryReader { proxy in
+            let cell = proxy.size.width / CGFloat(GameEngine.boardSize)
+            ZStack {
+                // 오아시스 파문 장식
+                ZStack {
+                    Circle()
+                        .stroke(Color.white.opacity(0.30), lineWidth: 1)
+                        .frame(width: cell * 0.62, height: cell * 0.62)
+                    Circle()
+                        .fill(Theme.oasis)
+                        .frame(width: cell * 0.34, height: cell * 0.34)
+                    Circle()
+                        .fill(Color.white.opacity(0.45))
+                        .frame(width: cell * 0.10, height: cell * 0.10)
+                        .offset(x: -cell * 0.05, y: -cell * 0.07)
+                }
+                .position(center(of: GameEngine.center, cell: cell))
+
+                // 마지막 수 표시
+                if let last = viewModel.lastMove {
+                    ForEach([last.from, last.to], id: \.self) { index in
+                        Rectangle()
+                            .fill(Theme.gold.opacity(0.16))
+                            .frame(width: cell, height: cell)
+                            .position(center(of: index, cell: cell))
+                    }
+                }
+
+                // 선택한 말
+                if let selection = viewModel.selection {
+                    RoundedRectangle(cornerRadius: 2)
+                        .stroke(Theme.gold, lineWidth: 2.5)
+                        .frame(width: cell - 3, height: cell - 3)
+                        .position(center(of: selection, cell: cell))
+                }
+
+                // 이동 가능 칸 (● 슬라이드 / ◆ L자)
+                ForEach(viewModel.targets, id: \.to) { move in
+                    Group {
+                        if move.kind == .slide {
+                            Circle()
+                                .fill(Color.black.opacity(0.42))
+                                .frame(width: cell * 0.30, height: cell * 0.30)
+                        } else {
+                            Rectangle()
+                                .fill(Color.black.opacity(0.42))
+                                .frame(width: cell * 0.26, height: cell * 0.26)
+                                .rotationEffect(.degrees(45))
+                        }
+                    }
+                    .position(center(of: move.to, cell: cell))
+                }
+
+                // 말 토큰 — 고유 ID로 identity를 고정해 미끄러지는 이동 애니메이션
                 ForEach(pieceList, id: \.id) { piece in
                     PieceToken(player: piece.player, size: cell * 0.82)
-                        .frame(width: cell, height: cell)
-                        .offset(x: CGFloat(piece.index % GameEngine.boardSize) * cell,
-                                y: CGFloat(piece.index / GameEngine.boardSize) * cell)
-                        .allowsHitTesting(false)
+                        .position(center(of: piece.index, cell: cell))
                         .animation(.spring(duration: 0.3), value: piece.index)
                 }
             }
-            .frame(width: side, height: side)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
-            .padding(8)
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Theme.bgRaised)
-                    .shadow(color: .black.opacity(0.45), radius: 20, y: 10)
-            )
-            .frame(maxWidth: .infinity)
         }
-        .aspectRatio(1.06, contentMode: .fit)
+        .allowsHitTesting(false)
     }
 
     /// 말 목록 — 뷰모델이 유지하는 말 고유 ID로 identity를 고정해
@@ -168,59 +245,6 @@ struct GameView: View {
             return (id, cell, player)
         }
         .sorted { $0.id < $1.id }
-    }
-
-    @ViewBuilder
-    private func cellView(_ index: Int, size: CGFloat) -> some View {
-        let terrain = GameEngine.terrain(at: index)
-        let r = index / GameEngine.boardSize
-        let c = index % GameEngine.boardSize
-        let base: Color = switch terrain {
-        case .oasis: Theme.oasisDeep
-        case .meadow: Theme.meadow
-        case .desert: (r + c) % 2 == 0 ? Theme.desert : Theme.desertAlt
-        }
-        let targetKind = viewModel.targets.first { $0.to == index }?.kind
-        let isLastMove = viewModel.lastMove.map { $0.from == index || $0.to == index } ?? false
-
-        ZStack {
-            Rectangle().fill(base)
-
-            if terrain == .oasis {
-                // 오아시스: 잔잔한 파문
-                Circle()
-                    .stroke(Color.white.opacity(0.30), lineWidth: 1)
-                    .frame(width: size * 0.62, height: size * 0.62)
-                Circle()
-                    .fill(Theme.oasis)
-                    .frame(width: size * 0.34, height: size * 0.34)
-                Circle()
-                    .fill(Color.white.opacity(0.45))
-                    .frame(width: size * 0.10, height: size * 0.10)
-                    .offset(x: -size * 0.05, y: -size * 0.07)
-            }
-            if isLastMove {
-                Rectangle().fill(Theme.gold.opacity(0.16))
-            }
-            if viewModel.selection == index {
-                RoundedRectangle(cornerRadius: 2)
-                    .stroke(Theme.gold, lineWidth: 2.5)
-                    .padding(1)
-            }
-            if let targetKind {
-                if targetKind == .slide {
-                    Circle()
-                        .fill(Color.black.opacity(0.42))
-                        .frame(width: size * 0.30, height: size * 0.30)
-                } else {
-                    Rectangle()
-                        .fill(Color.black.opacity(0.42))
-                        .frame(width: size * 0.26, height: size * 0.26)
-                        .rotationEffect(.degrees(45))
-                }
-            }
-        }
-        .overlay(Rectangle().stroke(Theme.cellLine, lineWidth: 0.5))
     }
 
     // MARK: 하단 바
