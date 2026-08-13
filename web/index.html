@@ -1,0 +1,77 @@
+<title>말 달리자</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="style.css">
+
+<div class="wrap">
+  <header class="masthead">
+    <h1>말 달리자</h1>
+    <span class="tagline">Run the Horses · 웹 프로토타입</span>
+  </header>
+
+  <div class="status">
+    <div id="score" class="score">
+      <span class="dot d1" aria-hidden="true"></span>
+      <span id="pips-1" class="pips" aria-label="밤색 말 라운드 승수">
+        <span class="pip"></span><span class="pip"></span>
+      </span>
+      <strong id="round-label">1라운드</strong>
+      <span id="pips-2" class="pips" aria-label="흰 말 라운드 승수">
+        <span class="pip"></span><span class="pip"></span>
+      </span>
+      <span class="dot d2" aria-hidden="true"></span>
+    </div>
+    <div id="puzzle-bar" class="puzzle-bar" style="display: none">
+      <button id="puzzle-prev" type="button" aria-label="이전 퍼즐">◀</button>
+      <div class="puzzle-info">
+        <strong id="puzzle-label"></strong>
+        <span id="puzzle-goal"></span>
+      </div>
+      <button id="puzzle-next" type="button" aria-label="다음 퍼즐">▶</button>
+    </div>
+    <span id="turn-chip" class="turn-chip"></span>
+  </div>
+
+  <div id="banner" class="banner" role="status">
+    <span id="banner-text"></span>
+    <button id="banner-btn" type="button"></button>
+  </div>
+
+  <div class="board-frame">
+    <div id="board" class="board" aria-label="게임판">
+      <div id="pieces" class="pieces" aria-hidden="true"></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <select id="mode" aria-label="게임 모드">
+      <option value="ai" selected>AI 대전</option>
+      <option value="2p">2인 대전</option>
+      <option value="tutorial">튜토리얼</option>
+      <option value="puzzle">퍼즐</option>
+    </select>
+    <select id="difficulty" aria-label="AI 난이도">
+      <option value="easy">쉬움</option>
+      <option value="normal" selected>보통</option>
+      <option value="hard">어려움</option>
+      <option value="expert">전문가</option>
+    </select>
+    <button id="undo" type="button">무르기</button>
+    <span class="spacer"></span>
+    <button id="sound" type="button" aria-label="소리 끄기">🔊</button>
+    <button id="new-match" class="primary" type="button">새 매치</button>
+  </div>
+
+  <details class="help">
+    <summary>게임 규칙</summary>
+    <ul>
+      <li>말을 <strong>정중앙 오아시스</strong>에 먼저 도착시키면 라운드 승리. <strong>3판 2선승</strong>.</li>
+      <li><strong>슬라이드 이동</strong>(●): 가장자리나 다른 말에 막히기 직전까지 가로/세로로 미끄러진다. 중간에 멈출 수 없다.</li>
+      <li><strong>L자 이동</strong>(◆): 체스 나이트처럼 점프. 도착 칸이 <strong>비어있는 사막 칸</strong>일 때만 가능 — 초원·오아시스에는 L자로 들어갈 수 없다.</li>
+      <li>오아시스에는 슬라이드로만 도착할 수 있다. 오아시스 <strong>반대편 인접 칸에 말(블로커)</strong>이 있어야 정확히 멈춘다.</li>
+      <li>라운드마다 선공이 바뀐다 (1·3라운드: 밤색 말, 2라운드: 흰 말).</li>
+    </ul>
+  </details>
+</div>
+
+<script type="module" src="app.js"></script>

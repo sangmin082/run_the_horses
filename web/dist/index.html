@@ -1,0 +1,1565 @@
+<title>말 달리자</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+/* 말 달리자 — 웹 프로토타입 스타일 */
+
+:root {
+  --bg: #efe3c4;
+  --surface: #f9f2df;
+  --text: #33261a;
+  --muted: #7d6a52;
+  --line: #d8c69e;
+  --accent: #2e7f8f;
+  --accent-ink: #ffffff;
+
+  --desert: #e8ce86;
+  --desert-alt: #e2c67a;
+  --meadow: #8fb36a;
+  --oasis: #3b93a5;
+  --cell-line: #c9b078;
+
+  --p1: #53331d;
+  --p1-ink: #f6eedc;
+  --p2: #f6eedc;
+  --p2-ink: #53331d;
+
+  --hint: rgba(46, 127, 143, 0.85);
+  --last: rgba(51, 38, 26, 0.18);
+}
+
+:root:not([data-theme="light"]) {
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1d1610;
+    --surface: #2a2117;
+    --text: #efe4cf;
+    --muted: #a89377;
+    --line: #453729;
+    --accent: #4aa3b3;
+    --accent-ink: #10262b;
+
+    --desert: #cfae65;
+    --desert-alt: #c6a55c;
+    --meadow: #7c9e58;
+    --oasis: #35818f;
+    --cell-line: #a98f52;
+
+    --hint: rgba(74, 163, 179, 0.9);
+    --last: rgba(239, 228, 207, 0.22);
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #1d1610;
+  --surface: #2a2117;
+  --text: #efe4cf;
+  --muted: #a89377;
+  --line: #453729;
+  --accent: #4aa3b3;
+  --accent-ink: #10262b;
+
+  --desert: #cfae65;
+  --desert-alt: #c6a55c;
+  --meadow: #7c9e58;
+  --oasis: #35818f;
+  --cell-line: #a98f52;
+
+  --hint: rgba(74, 163, 179, 0.9);
+  --last: rgba(239, 228, 207, 0.22);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+    "Malgun Gothic", "Segoe UI", Roboto, sans-serif;
+  line-height: 1.5;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.wrap {
+  width: min(560px, 100vw - 24px);
+  padding: 20px 0 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+header.masthead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+h1 {
+  margin: 0;
+  font-family: "Apple Myungjo", "Nanum Myeongjo", Batang, Georgia, serif;
+  font-size: 2rem;
+  letter-spacing: 0.02em;
+}
+
+.tagline {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+/* 상태 바 */
+.status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+
+.score {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+}
+
+.pips {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.pip {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1.5px solid var(--muted);
+  background: transparent;
+}
+
+.pip.won-1 { background: var(--p1); border-color: var(--p1); }
+.pip.won-2 { background: var(--p2); border-color: var(--p2-ink); }
+
+.puzzle-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.puzzle-bar button {
+  padding: 4px 8px;
+  font-size: 0.8rem;
+}
+
+.puzzle-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: 0.85rem;
+  line-height: 1.3;
+}
+
+.puzzle-info span {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.turn-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  white-space: nowrap;
+}
+
+.dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.dot.d1 { background: var(--p1); }
+.dot.d2 { background: var(--p2); border: 1px solid var(--p2-ink); }
+
+.turn-chip.thinking {
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* 보드 */
+.board-frame {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.board {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(11, 1fr);
+  grid-auto-rows: 1fr;
+  aspect-ratio: 1;
+  border: 2px solid var(--cell-line);
+  border-radius: 6px;
+  overflow: hidden;
+  touch-action: manipulation;
+}
+
+.cell {
+  position: relative;
+  appearance: none;
+  background: var(--desert);
+  border: 0.5px solid var(--cell-line);
+  border-radius: 0;
+  cursor: pointer;
+  padding: 0;
+}
+
+.cell.alt { background: var(--desert-alt); }
+.cell.meadow { background: var(--meadow); }
+.cell.oasis {
+  background: var(--oasis);
+  background-image: radial-gradient(circle at 50% 42%,
+    rgba(255, 255, 255, 0.35) 0 18%, transparent 42%);
+}
+
+.cell.last-from,
+.cell.last-to {
+  box-shadow: inset 0 0 0 999px var(--last);
+}
+
+.cell.hint::after {
+  content: "";
+  position: absolute;
+  inset: 32%;
+  border-radius: 50%;
+  background: var(--hint);
+}
+
+.cell.hint-l::after {
+  border-radius: 22%;
+  transform: rotate(45deg);
+  inset: 34%;
+}
+
+.cell.selected {
+  outline: 3px solid var(--accent);
+  outline-offset: -3px;
+  z-index: 2;
+}
+
+/* 말: 그리드 위 절대배치 레이어에서 transform으로 이동 */
+.pieces {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3; /* position:relative인 셀들이 DOM 순서상 위에 그려지는 것 방지 */
+}
+
+.piece {
+  position: absolute;
+  width: calc(100% / 11);
+  height: calc(100% / 11);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(14px, 3.4vw, 26px);
+  transition: transform 0.28s cubic-bezier(0.3, 0.9, 0.4, 1);
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .piece { transition: none; }
+}
+
+.piece span {
+  width: 78%;
+  height: 78%;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+.piece.p1 span { background: var(--p1); color: var(--p1-ink); }
+.piece.p2 span { background: var(--p2); color: var(--p2-ink); }
+
+/* 컨트롤 */
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.controls .spacer { flex: 1; }
+
+select,
+button {
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 12px;
+  cursor: pointer;
+}
+
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+button:focus-visible,
+select:focus-visible,
+.cell:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* 배너 / 오버레이 */
+.banner {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-weight: 600;
+}
+
+.banner.show { display: flex; }
+
+.banner button {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: transparent;
+  color: #1e3a40;
+  font-weight: 600;
+}
+
+.help {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.help summary {
+  cursor: pointer;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.help ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.help li { margin: 4px 0; }
+</style>
+
+<div class="wrap">
+  <header class="masthead">
+    <h1>말 달리자</h1>
+    <span class="tagline">Run the Horses · 웹 프로토타입</span>
+  </header>
+
+  <div class="status">
+    <div id="score" class="score">
+      <span class="dot d1" aria-hidden="true"></span>
+      <span id="pips-1" class="pips" aria-label="밤색 말 라운드 승수">
+        <span class="pip"></span><span class="pip"></span>
+      </span>
+      <strong id="round-label">1라운드</strong>
+      <span id="pips-2" class="pips" aria-label="흰 말 라운드 승수">
+        <span class="pip"></span><span class="pip"></span>
+      </span>
+      <span class="dot d2" aria-hidden="true"></span>
+    </div>
+    <div id="puzzle-bar" class="puzzle-bar" style="display: none">
+      <button id="puzzle-prev" type="button" aria-label="이전 퍼즐">◀</button>
+      <div class="puzzle-info">
+        <strong id="puzzle-label"></strong>
+        <span id="puzzle-goal"></span>
+      </div>
+      <button id="puzzle-next" type="button" aria-label="다음 퍼즐">▶</button>
+    </div>
+    <span id="turn-chip" class="turn-chip"></span>
+  </div>
+
+  <div id="banner" class="banner" role="status">
+    <span id="banner-text"></span>
+    <button id="banner-btn" type="button"></button>
+  </div>
+
+  <div class="board-frame">
+    <div id="board" class="board" aria-label="게임판">
+      <div id="pieces" class="pieces" aria-hidden="true"></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <select id="mode" aria-label="게임 모드">
+      <option value="ai" selected>AI 대전</option>
+      <option value="2p">2인 대전</option>
+      <option value="tutorial">튜토리얼</option>
+      <option value="puzzle">퍼즐</option>
+    </select>
+    <select id="difficulty" aria-label="AI 난이도">
+      <option value="easy">쉬움</option>
+      <option value="normal" selected>보통</option>
+      <option value="hard">어려움</option>
+      <option value="expert">전문가</option>
+    </select>
+    <button id="undo" type="button">무르기</button>
+    <span class="spacer"></span>
+    <button id="sound" type="button" aria-label="소리 끄기">🔊</button>
+    <button id="new-match" class="primary" type="button">새 매치</button>
+  </div>
+
+  <details class="help">
+    <summary>게임 규칙</summary>
+    <ul>
+      <li>말을 <strong>정중앙 오아시스</strong>에 먼저 도착시키면 라운드 승리. <strong>3판 2선승</strong>.</li>
+      <li><strong>슬라이드 이동</strong>(●): 가장자리나 다른 말에 막히기 직전까지 가로/세로로 미끄러진다. 중간에 멈출 수 없다.</li>
+      <li><strong>L자 이동</strong>(◆): 체스 나이트처럼 점프. 도착 칸이 <strong>비어있는 사막 칸</strong>일 때만 가능 — 초원·오아시스에는 L자로 들어갈 수 없다.</li>
+      <li>오아시스에는 슬라이드로만 도착할 수 있다. 오아시스 <strong>반대편 인접 칸에 말(블로커)</strong>이 있어야 정확히 멈춘다.</li>
+      <li>라운드마다 선공이 바뀐다 (1·3라운드: 밤색 말, 2라운드: 흰 말).</li>
+    </ul>
+  </details>
+</div>
+
+<script>
+"use strict";
+// ===== engine/src/board.js =====
+// 말 달리자 — 보드 정의 (순수 로직, UI 무의존)
+//
+// 좌표계: 11x11, r(행) 0~10 = 'a'~'k', c(열) 0~10 = 1~11
+// 인덱스 idx = r * 11 + c. 정중앙 f6 = (5,5) = idx 60.
+
+const SIZE = 11;
+const CELLS = SIZE * SIZE;
+const CENTER = 5 * SIZE + 5; // f6, 오아시스
+
+// 칸 종류
+const DESERT = 0; // 사막(노랑)
+const MEADOW = 1; // 초원(초록) — 오아시스를 둘러싼 8칸
+const OASIS = 2;  // 오아시스 — 정중앙 1칸
+
+// 말 (보드 배열 값)
+const EMPTY = 0;
+const P1 = 1; // 선공 기준 플레이어 1
+const P2 = 2;
+
+function rc(idx) {
+  return [Math.floor(idx / SIZE), idx % SIZE];
+}
+
+function idxOf(r, c) {
+  return r * SIZE + c;
+}
+
+function inBounds(r, c) {
+  return r >= 0 && r < SIZE && c >= 0 && c < SIZE;
+}
+
+// 'f6' 같은 표기 <-> 인덱스
+function toNotation(idx) {
+  const [r, c] = rc(idx);
+  return String.fromCharCode(97 + r) + (c + 1);
+}
+
+function fromNotation(s) {
+  const r = s.charCodeAt(0) - 97;
+  const c = parseInt(s.slice(1), 10) - 1;
+  if (!inBounds(r, c)) throw new Error(`잘못된 좌표: ${s}`);
+  return idxOf(r, c);
+}
+
+// 칸 종류 조회 — 초원은 중앙에서 맨해튼 거리 2 이내의 12칸 다이아몬드.
+// (팬게임 horse-run-game 소스와 교차 검증. docs/competitor-analysis.md 참고)
+function terrainOf(idx) {
+  if (idx === CENTER) return OASIS;
+  const [r, c] = rc(idx);
+  if (Math.abs(r - 5) + Math.abs(c - 5) <= 2) return MEADOW;
+  return DESERT;
+}
+
+// 초기 배치 — 각 플레이어가 대각 방향으로 마주보는 두 코너에 ㄱ자(브래킷)
+// 형태로 5개씩 배치한다. (위키 서술 "각 대각선 위치에서 마주보는 형태로 5개씩"과
+// 부합하며, 팬게임 horse-run-game의 배치와 동일. 최종 확정은 원작 영상 대조로.)
+// P1(선공): 좌상 코너 + 우하 코너
+// P2(후공): 우상 코너 + 좌하 코너
+const INITIAL_P1 = ['a1', 'a2', 'a3', 'b1', 'c1', 'i11', 'j11', 'k11', 'k10', 'k9'];
+const INITIAL_P2 = ['a9', 'a10', 'a11', 'b11', 'c11', 'i1', 'j1', 'k1', 'k2', 'k3'];
+
+// 새 라운드용 보드 배열 생성
+function initialBoard() {
+  const board = new Uint8Array(CELLS);
+  for (const s of INITIAL_P1) board[fromNotation(s)] = P1;
+  for (const s of INITIAL_P2) board[fromNotation(s)] = P2;
+  return board;
+}
+
+function opponent(player) {
+  return player === P1 ? P2 : P1;
+}
+
+// ===== engine/src/rules.js =====
+// 말 달리자 — 이동 규칙 (합법수 생성 / 적용 / 승리 판정)
+
+// 슬라이드 방향: 상, 하, 좌, 우
+const SLIDE_DIRS = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+
+// L자 이동(나이트) 오프셋 — 한 칸 전진 후 대각선 한 칸 = 변위 (±1,±2)/(±2,±1)
+const KNIGHT_OFFSETS = [
+  [-2, -1], [-2, 1], [-1, -2], [-1, 2],
+  [1, -2], [1, 2], [2, -1], [2, 1],
+];
+
+const SLIDE = 'slide';
+const LMOVE = 'lmove';
+
+// 특정 말(from)의 합법수 목록. 이동은 {from, to, kind}.
+function movesForPiece(board, from) {
+  const moves = [];
+  const [r, c] = rc(from);
+
+  // 슬라이드: 가장자리나 다른 말에 막히기 직전까지 직선 이동 (중간 정지 불가)
+  for (const [dr, dc] of SLIDE_DIRS) {
+    let nr = r + dr;
+    let nc = c + dc;
+    let last = -1;
+    while (inBounds(nr, nc) && board[idxOf(nr, nc)] === EMPTY) {
+      last = idxOf(nr, nc);
+      nr += dr;
+      nc += dc;
+    }
+    if (last !== -1) moves.push({ from, to: last, kind: SLIDE });
+  }
+
+  // L자: 나이트처럼 점프. 도착 칸이 "비어있는 사막 칸"일 때만 가능
+  for (const [dr, dc] of KNIGHT_OFFSETS) {
+    const nr = r + dr;
+    const nc = c + dc;
+    if (!inBounds(nr, nc)) continue;
+    const to = idxOf(nr, nc);
+    if (board[to] === EMPTY && terrainOf(to) === DESERT) {
+      moves.push({ from, to, kind: LMOVE });
+    }
+  }
+
+  return moves;
+}
+
+// player의 전체 합법수
+function legalMoves(board, player) {
+  const moves = [];
+  for (let i = 0; i < board.length; i++) {
+    if (board[i] === player) moves.push(...movesForPiece(board, i));
+  }
+  return moves;
+}
+
+// 이동 적용 (board를 제자리 수정). 되돌리기용으로 from/to를 반환.
+function applyMove(board, move) {
+  board[move.to] = board[move.from];
+  board[move.from] = EMPTY;
+}
+
+function undoMove(board, move) {
+  board[move.from] = board[move.to];
+  board[move.to] = EMPTY;
+}
+
+// 이동 직후 라운드 승리 여부: 오아시스 도착이 유일한 승리 조건
+function isWinningMove(move) {
+  return move.to === CENTER;
+}
+
+// player가 이번 수로 즉시 승리할 수 있는 이동 목록
+function winningMoves(board, player) {
+  return legalMoves(board, player).filter(isWinningMove);
+}
+
+// ===== engine/src/game.js =====
+// 말 달리자 — 매치 상태머신 (3라운드, 2선승, 라운드별 선공 교대)
+
+
+const MAX_ROUNDS = 3;
+const WINS_NEEDED = 2;
+
+class Match {
+  constructor() {
+    this.roundWins = { [P1]: 0, [P2]: 0 };
+    this.roundNumber = 0; // 1부터 시작 (startRound에서 증가)
+    this.matchWinner = null;
+    this.startRound();
+  }
+
+  // 라운드별 선공 교대: 1·3라운드 P1, 2라운드 P2
+  startRound() {
+    this.roundNumber += 1;
+    this.board = initialBoard();
+    this.turn = this.roundNumber % 2 === 1 ? P1 : P2;
+    this.roundWinner = null;
+    this.history = [];
+  }
+
+  legalMoves() {
+    if (this.roundWinner !== null || this.matchWinner !== null) return [];
+    return legalMoves(this.board, this.turn);
+  }
+
+  // 현재 차례 플레이어의 이동을 적용. 라운드/매치 종료를 갱신하고 결과를 반환.
+  play(move) {
+    if (this.roundWinner !== null || this.matchWinner !== null) {
+      throw new Error('라운드가 이미 종료됨');
+    }
+    applyMove(this.board, move);
+    this.history.push({ ...move, player: this.turn });
+
+    if (isWinningMove(move)) {
+      this.roundWinner = this.turn;
+      this.roundWins[this.turn] += 1;
+      if (this.roundWins[this.turn] >= WINS_NEEDED) {
+        this.matchWinner = this.turn;
+      }
+      return { roundOver: true, matchOver: this.matchWinner !== null, winner: this.turn };
+    }
+
+    this.turn = opponent(this.turn);
+    return { roundOver: false, matchOver: false, winner: null };
+  }
+
+  // 현재 라운드의 마지막 수를 무른다. 라운드 경계는 넘지 못한다.
+  // 되돌렸으면 true, 무를 수가 없으면 false.
+  undo() {
+    if (this.history.length === 0) return false;
+    const last = this.history.pop();
+    undoMove(this.board, last);
+    if (this.roundWinner === last.player) {
+      // 승리 수를 무르는 경우: 라운드/매치 결과도 되돌린다
+      this.roundWins[last.player] -= 1;
+      this.roundWinner = null;
+      this.matchWinner = null;
+    }
+    this.turn = last.player;
+    return true;
+  }
+
+  // 라운드 종료 후 다음 라운드로 진행 (매치가 끝나지 않았을 때만)
+  nextRound() {
+    if (this.matchWinner !== null) throw new Error('매치가 이미 종료됨');
+    if (this.roundWinner === null) throw new Error('라운드가 아직 진행 중');
+    this.startRound();
+  }
+}
+
+// ===== engine/src/ai.js =====
+// 말 달리자 — AI
+// 네가맥스 + 알파-베타 + 조브리스트 해시 트랜스포지션 테이블 + 반복 심화(시간제한)
+
+
+const WIN_SCORE = 100000;
+const WIN_THRESHOLD = 90000; // 이 이상이면 승리 확정 점수로 취급 (플라이 보정 대상)
+
+// mulberry32 — 재현 가능한 시뮬레이션을 위한 시드 RNG
+function makeRng(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// --- 조브리스트 해시 (32비트, 셀×말 + 차례) ---
+const ZOBRIST = (() => {
+  const rng = makeRng(0xc0ffee);
+  const table = { [P1]: new Int32Array(CELLS), [P2]: new Int32Array(CELLS) };
+  for (const p of [P1, P2]) {
+    for (let i = 0; i < CELLS; i++) table[p][i] = (rng() * 0x100000000) | 0;
+  }
+  return table;
+})();
+const ZOBRIST_TURN = 0x5eed1234 | 0;
+
+function hashBoard(board, toMove) {
+  let h = toMove === P1 ? 0 : ZOBRIST_TURN;
+  for (let i = 0; i < CELLS; i++) {
+    if (board[i] !== EMPTY) h ^= ZOBRIST[board[i]][i];
+  }
+  return h | 0;
+}
+
+// --- 오아시스 진입 가능성 스캔 ---
+// 각 방향에서 중앙에 가장 가까운 말을 찾아, 그 말이 슬라이드로 오아시스에
+// "정확히 멈출 수 있는지"(반대편 인접 칸에 블로커 존재 + 경로 깨끗)를 판정한다.
+function scanCenterLines(board) {
+  const result = {
+    [P1]: { wins: 0, near: 0 },
+    [P2]: { wins: 0, near: 0 },
+  };
+  const [cr, cc] = rc(CENTER);
+  const dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+
+  for (const [dr, dc] of dirs) {
+    let r = cr + dr;
+    let c = cc + dc;
+    let piece = EMPTY;
+    while (r >= 0 && r < 11 && c >= 0 && c < 11) {
+      const v = board[r * 11 + c];
+      if (v !== EMPTY) { piece = v; break; }
+      r += dr;
+      c += dc;
+    }
+    if (piece === EMPTY) continue;
+    // 그 말이 중앙으로 미끄러질 때 멈춰줄 블로커: 반대편 인접 칸
+    const blocked = board[(cr - dr) * 11 + (cc - dc)] !== EMPTY;
+    if (blocked) result[piece].wins += 1;
+    else result[piece].near += 1;
+  }
+  return result;
+}
+
+// player 관점의 정적 평가
+function evaluate(board, player) {
+  const opp = opponent(player);
+  const lines = scanCenterLines(board);
+  let score = 0;
+
+  score += 6000 * Math.min(lines[player].wins, 2);
+  score -= 6000 * Math.min(lines[opp].wins, 2);
+  score += 120 * lines[player].near;
+  score -= 120 * lines[opp].near;
+
+  for (let i = 0; i < CELLS; i++) {
+    const v = board[i];
+    if (v === EMPTY) continue;
+    const sign = v === player ? 1 : -1;
+    const r = (i / 11) | 0;
+    const c = i % 11;
+    const dist = Math.abs(r - 5) + Math.abs(c - 5);
+    score += sign * (10 - dist) * 3; // 중앙 접근
+    if (r === 5 || c === 5) score += sign * 6; // 중앙 라인 점유
+  }
+  return score;
+}
+
+// 이동 정렬 점수 (TT 최선 수는 별도로 최우선)
+function moveOrderKey(m) {
+  if (isWinningMove(m)) return 1e9;
+  const [r, c] = rc(m.to);
+  const [fr, fc] = rc(m.from);
+  const dTo = Math.abs(r - 5) + Math.abs(c - 5);
+  const dFrom = Math.abs(fr - 5) + Math.abs(fc - 5);
+  let key = (dFrom - dTo) * 10;
+  if (r === 5 || c === 5) key += 5;
+  return key;
+}
+
+const TT_EXACT = 0;
+const TT_LOWER = 1;
+const TT_UPPER = 2;
+
+class SearchTimeout extends Error {}
+
+// 탐색 컨텍스트: 트랜스포지션 테이블 + 시간 예산
+class Search {
+  constructor(options = {}) {
+    this.tt = new Map();
+    // V8 Map 최대 크기(약 2^24) 초과 방지: 상한 도달 시 테이블을 비우고 계속한다
+    this.maxTtEntries = options.maxTtEntries ?? 1 << 22;
+    this.deadline = options.deadline ?? Infinity;
+    this.nodes = 0;
+  }
+
+  checkTime() {
+    if ((this.nodes & 1023) === 0 && Date.now() > this.deadline) {
+      throw new SearchTimeout();
+    }
+  }
+
+  negamax(board, hash, depth, alpha, beta, toMove, ply) {
+    this.nodes += 1;
+    this.checkTime();
+
+    const alphaOrig = alpha;
+    const entry = this.tt.get(hash);
+    let ttMove = null;
+    if (entry) {
+      ttMove = entry.move;
+      if (entry.depth >= depth) {
+        let s = entry.score;
+        if (s > WIN_THRESHOLD) s -= ply;
+        else if (s < -WIN_THRESHOLD) s += ply;
+        if (entry.flag === TT_EXACT) return s;
+        if (entry.flag === TT_LOWER && s > alpha) alpha = s;
+        else if (entry.flag === TT_UPPER && s < beta) beta = s;
+        if (alpha >= beta) return s;
+      }
+    }
+
+    const moves = legalMoves(board, toMove);
+    if (moves.length === 0) return 0; // 이동 불가 = 무승부 취급
+
+    for (const m of moves) {
+      if (isWinningMove(m)) return WIN_SCORE - ply;
+    }
+    if (depth === 0) return evaluate(board, toMove);
+
+    // 정렬: TT 수 최우선, 나머지는 휴리스틱
+    moves.sort((a, b) => {
+      const aTt = ttMove && a.from === ttMove.from && a.to === ttMove.to ? 1 : 0;
+      const bTt = ttMove && b.from === ttMove.from && b.to === ttMove.to ? 1 : 0;
+      if (aTt !== bTt) return bTt - aTt;
+      return moveOrderKey(b) - moveOrderKey(a);
+    });
+
+    let best = -Infinity;
+    let bestMoveHere = null;
+    const piece = toMove;
+    for (const m of moves) {
+      const childHash = (hash
+        ^ ZOBRIST[piece][m.from] ^ ZOBRIST[piece][m.to] ^ ZOBRIST_TURN) | 0;
+      applyMove(board, m);
+      let score;
+      try {
+        score = -this.negamax(
+          board, childHash, depth - 1, -beta, -alpha, opponent(toMove), ply + 1,
+        );
+      } finally {
+        // 시간 초과 예외로 중단되어도 보드를 반드시 복원한다
+        undoMove(board, m);
+      }
+      if (score > best) {
+        best = score;
+        bestMoveHere = m;
+      }
+      if (best > alpha) alpha = best;
+      if (alpha >= beta) break;
+    }
+
+    // TT 저장 (승리 점수는 플라이 무관 형태로 보정해 저장)
+    let stored = best;
+    if (stored > WIN_THRESHOLD) stored += ply;
+    else if (stored < -WIN_THRESHOLD) stored -= ply;
+    const flag = best <= alphaOrig ? TT_UPPER : best >= beta ? TT_LOWER : TT_EXACT;
+    if (this.tt.size >= this.maxTtEntries) this.tt.clear();
+    this.tt.set(hash, { depth, score: stored, flag, move: bestMoveHere });
+
+    return best;
+  }
+
+  // 루트 탐색: 각 수의 점수 목록 반환
+  rootSearch(board, player, depth) {
+    const moves = legalMoves(board, player);
+    const win = moves.find(isWinningMove);
+    if (win) return [{ m: win, score: WIN_SCORE }];
+
+    const hash = hashBoard(board, player);
+    const entry = this.tt.get(hash);
+    const ttMove = entry?.move ?? null;
+    moves.sort((a, b) => {
+      const aTt = ttMove && a.from === ttMove.from && a.to === ttMove.to ? 1 : 0;
+      const bTt = ttMove && b.from === ttMove.from && b.to === ttMove.to ? 1 : 0;
+      if (aTt !== bTt) return bTt - aTt;
+      return moveOrderKey(b) - moveOrderKey(a);
+    });
+
+    const scored = [];
+    let alpha = -Infinity;
+    for (const m of moves) {
+      const childHash = (hash
+        ^ ZOBRIST[player][m.from] ^ ZOBRIST[player][m.to] ^ ZOBRIST_TURN) | 0;
+      applyMove(board, m);
+      let score;
+      try {
+        score = -this.negamax(
+          board, childHash, depth - 1, -Infinity, -alpha, opponent(player), 1,
+        );
+      } finally {
+        // 시간 초과 예외로 중단되어도 보드를 반드시 복원한다
+        undoMove(board, m);
+      }
+      scored.push({ m, score });
+      if (score > alpha) alpha = score;
+    }
+    scored.sort((a, b) => b.score - a.score);
+    return scored;
+  }
+}
+
+// 난이도 프리셋
+const DIFFICULTY = {
+  easy: { depth: 1, randomness: 3 },   // 상위 3개 수 중 무작위
+  normal: { depth: 2, randomness: 1 },
+  hard: { depth: 3, randomness: 1 },
+  expert: { timeMs: 800, maxDepth: 9, randomness: 1 }, // 반복 심화 + 시간제한
+};
+
+// 최선 수 선택.
+// options: { depth } 고정 깊이, 또는 { timeMs, maxDepth } 반복 심화.
+//          { randomness, rng } 상위권 무작위 선택.
+function bestMove(board, player, options = {}) {
+  const randomness = options.randomness ?? 1;
+  const rng = options.rng ?? Math.random;
+
+  const moves = legalMoves(board, player);
+  if (moves.length === 0) return null;
+  const win = moves.find(isWinningMove);
+  if (win) return win;
+
+  let scored = null;
+  if (options.timeMs) {
+    // 반복 심화: 시간이 다 되면 마지막으로 완료한 깊이의 결과 사용
+    const search = new Search({ deadline: Date.now() + options.timeMs });
+    const maxDepth = options.maxDepth ?? 9;
+    for (let d = 1; d <= maxDepth; d++) {
+      try {
+        scored = search.rootSearch(board, player, d);
+      } catch (e) {
+        if (e instanceof SearchTimeout) break;
+        throw e;
+      }
+      if (scored[0].score > WIN_THRESHOLD) break; // 승리 라인 확정
+    }
+    if (!scored) scored = new Search().rootSearch(board, player, 1);
+  } else {
+    const depth = options.depth ?? 2;
+    scored = new Search().rootSearch(board, player, depth);
+  }
+
+  const pool = scored.filter(
+    (s, i) => i < randomness || s.score === scored[0].score,
+  );
+  return pool[Math.floor(rng() * pool.length)].m;
+}
+
+// 탐색 점수 조회: player가 둘 차례일 때 최선 수의 점수 (player 관점)
+function searchScore(board, player, depth) {
+  return new Search().rootSearch(board, player, depth)[0].score;
+}
+
+// 강제승 판정: player가 plies 플라이 안에 승리를 강제할 수 있으면 승리 수를 반환
+function forcedWin(board, player, plies) {
+  const search = new Search();
+  const scored = search.rootSearch(board, player, plies);
+  if (scored[0].score > WIN_THRESHOLD) return scored[0].m;
+  return null;
+}
+
+// ===== web/puzzles.js =====
+// 자동 생성 파일 — tools/gen-puzzles.js (시드 511). 직접 수정하지 말 것.
+// board: 121글자(0=빈칸, 1=밤색 말, 2=흰 말), toMove: 둘 차례, ownMoves: 허용되는 내 수
+const PUZZLES = [
+  {
+    "id": "e1",
+    "title": "연습 1",
+    "board": "0000000000001000200000000000000000010000000000010000000121000002200000020021000002211100000021000000000020000000000000000",
+    "toMove": 2,
+    "ownMoves": 1
+  },
+  {
+    "id": "e2",
+    "title": "연습 2",
+    "board": "0000000000000000000000000002000000002110000000010000000000110001200002000220000002121000000002200000000010000000000100000",
+    "toMove": 1,
+    "ownMoves": 1
+  },
+  {
+    "id": "e3",
+    "title": "연습 3",
+    "board": "0000000000000000200000000011200000000000000001000001000020000222100002002100000000000101000201000000000010000020000000000",
+    "toMove": 2,
+    "ownMoves": 1
+  },
+  {
+    "id": "e4",
+    "title": "연습 4",
+    "board": "0000000000000000200000000001000000000000000000020000000212000002000001011100000020221000200000010000000110000000000200000",
+    "toMove": 1,
+    "ownMoves": 1
+  },
+  {
+    "id": "p1",
+    "title": "퍼즐 1",
+    "board": "0000000000000000200000000102000000010000000000010000000121000002200000000021000002211100000021000000000020000000000000000",
+    "toMove": 2,
+    "ownMoves": 2
+  },
+  {
+    "id": "p2",
+    "title": "퍼즐 2",
+    "board": "0000000000000000000000000002000000002110000000010000000000100011200002000200000002121200000002200000000010000000000100000",
+    "toMove": 1,
+    "ownMoves": 2
+  },
+  {
+    "id": "p3",
+    "title": "퍼즐 3",
+    "board": "0000000000000000100000000002000000000002000000200012000112100002110000000000200021200000000001100000000002000000000000000",
+    "toMove": 1,
+    "ownMoves": 2
+  },
+  {
+    "id": "p4",
+    "title": "퍼즐 4",
+    "board": "0000000000000001000000000012000000000220020000000000020012100001100200100000000001210000000002100000000020000000000000000",
+    "toMove": 2,
+    "ownMoves": 2
+  },
+  {
+    "id": "p5",
+    "title": "퍼즐 5",
+    "board": "0000000000000000200000000011200000000002000001000001000020000022100000002110000000000000002201000000000010010020000000000",
+    "toMove": 2,
+    "ownMoves": 2
+  },
+  {
+    "id": "p6",
+    "title": "퍼즐 6",
+    "board": "0000000000000000200000000001000000000000000000020000000212000002000001001100000022121000000002010000000110000000000200000",
+    "toMove": 1,
+    "ownMoves": 2
+  },
+  {
+    "id": "p7",
+    "title": "퍼즐 7",
+    "board": "0000010000000000000000000020000000002121000000012001000012200012100000200000000000010000000002000000000010000000000200000",
+    "toMove": 2,
+    "ownMoves": 2
+  },
+  {
+    "id": "p8",
+    "title": "퍼즐 8",
+    "board": "0000020000000000100000000002000000000100000000000001200012200001200020002100000000010100000001200000000021000000000000000",
+    "toMove": 2,
+    "ownMoves": 2
+  }
+];
+
+// ===== web/app.js =====
+// 말 달리자 — 웹 프로토타입 UI
+
+
+
+
+
+const boardEl = document.getElementById('board');
+const piecesEl = document.getElementById('pieces');
+const turnChip = document.getElementById('turn-chip');
+const pipsEls = { [P1]: document.getElementById('pips-1'), [P2]: document.getElementById('pips-2') };
+const roundLabel = document.getElementById('round-label');
+const scoreEl = document.getElementById('score');
+const puzzleBar = document.getElementById('puzzle-bar');
+const puzzleLabel = document.getElementById('puzzle-label');
+const puzzleGoal = document.getElementById('puzzle-goal');
+const banner = document.getElementById('banner');
+const bannerText = document.getElementById('banner-text');
+const bannerBtn = document.getElementById('banner-btn');
+const modeSel = document.getElementById('mode');
+const diffSel = document.getElementById('difficulty');
+const newBtn = document.getElementById('new-match');
+const undoBtn = document.getElementById('undo');
+const soundBtn = document.getElementById('sound');
+const prevPuzzleBtn = document.getElementById('puzzle-prev');
+const nextPuzzleBtn = document.getElementById('puzzle-next');
+
+let match = new Match();
+let selected = null;
+let legal = [];
+let lastMove = null;
+let aiTimer = null;
+let pieceEls = new Map();
+
+// 퍼즐 모드 상태
+let puzzleIndex = 0;
+let puzzleHuman = P1; // 퍼즐에서 사람이 조작하는 진영
+let ownMovesUsed = 0;
+
+// 튜토리얼 정의: 각 단계는 고정 포지션에서 특정 이동을 성공시키면 통과
+const TUTORIAL = [
+  {
+    title: '1단계 · 슬라이드',
+    text: '말은 가장자리나 다른 말에 막히기 직전까지 미끄러집니다(중간 정지 불가). k6의 말을 위로 끝까지 — a6까지 — 보내보세요.',
+    pieces: [['k6', P1]],
+    check: (m) => toNotation(m.from) === 'k6' && toNotation(m.to) === 'a6',
+  },
+  {
+    title: '2단계 · L자 이동',
+    text: '나이트처럼 점프하되 비어있는 사막 칸에만 도착할 수 있어요. 초록 초원 칸으로는 L자 이동이 안 됩니다. d5의 말로 L자 이동(◆)을 해보세요.',
+    pieces: [['d5', P1]],
+    check: (m) => m.kind !== SLIDE,
+  },
+  {
+    title: '3단계 · 오아시스 진입',
+    text: '오아시스엔 슬라이드로만 도착할 수 있고, 반대편 인접 칸에 블로커가 있어야 정확히 멈춥니다. e6의 블로커를 이용해 k6의 말을 f6에 세워보세요.',
+    pieces: [['k6', P1], ['e6', P2]],
+    check: (m) => m.to === CENTER,
+  },
+];
+let tutStep = 0;
+
+const HORSE = { [P1]: '♞', [P2]: '♘' };
+
+// --- 사운드 (WebAudio 미니 신스) ---
+let audioCtx = null;
+let muted = localStorage.getItem('rth-muted') === '1';
+
+function beep(freq, duration = 0.07, delay = 0, type = 'triangle', gain = 0.12) {
+  if (muted) return;
+  try {
+    audioCtx = audioCtx ?? new (window.AudioContext ?? window.webkitAudioContext)();
+    const t = audioCtx.currentTime + delay;
+    const osc = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    g.gain.setValueAtTime(gain, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + duration);
+    osc.connect(g).connect(audioCtx.destination);
+    osc.start(t);
+    osc.stop(t + duration + 0.02);
+  } catch { /* 사운드 실패는 무시 */ }
+}
+
+const sfx = {
+  slide: () => { beep(320, 0.06); beep(480, 0.06, 0.05); },
+  lmove: () => beep(560, 0.08),
+  win: () => { beep(523, 0.1); beep(659, 0.1, 0.09); beep(784, 0.18, 0.18); },
+  lose: () => { beep(330, 0.12); beep(262, 0.2, 0.11); },
+};
+
+function renderSoundBtn() {
+  soundBtn.textContent = muted ? '🔇' : '🔊';
+  soundBtn.setAttribute('aria-label', muted ? '소리 켜기' : '소리 끄기');
+}
+
+soundBtn.addEventListener('click', () => {
+  muted = !muted;
+  localStorage.setItem('rth-muted', muted ? '1' : '0');
+  renderSoundBtn();
+});
+
+// --- 퍼즐 진행 저장 ---
+function solvedSet() {
+  try {
+    return new Set(JSON.parse(localStorage.getItem('rth-solved') ?? '[]'));
+  } catch {
+    return new Set();
+  }
+}
+
+function markSolved(id) {
+  const s = solvedSet();
+  s.add(id);
+  localStorage.setItem('rth-solved', JSON.stringify([...s]));
+}
+
+// --- 모드 헬퍼 ---
+function mode() {
+  return modeSel.value;
+}
+
+function isAiTurn() {
+  if (match.roundWinner !== null || match.matchWinner !== null) return false;
+  if (mode() === 'ai') return match.turn === P2;
+  if (mode() === 'puzzle') return match.turn !== puzzleHuman;
+  return false; // 2인 대전·튜토리얼은 AI 없음
+}
+
+function aiOptions() {
+  if (mode() === 'puzzle') return { depth: 3, randomness: 1 };
+  return DIFFICULTY[diffSel.value] ?? DIFFICULTY.normal;
+}
+
+// --- 보드 셀 생성 (한 번만) ---
+const cellEls = [];
+for (let i = 0; i < SIZE * SIZE; i++) {
+  const cell = document.createElement('button');
+  cell.className = 'cell';
+  const t = terrainOf(i);
+  if (t === MEADOW) cell.classList.add('meadow');
+  else if (t === OASIS) cell.classList.add('oasis');
+  else {
+    const [r, c] = rc(i);
+    if ((r + c) % 2 === 1) cell.classList.add('alt');
+  }
+  cell.setAttribute('aria-label', toNotation(i));
+  cell.addEventListener('click', () => onCellClick(i));
+  boardEl.appendChild(cell);
+  cellEls.push(cell);
+}
+
+function pieceTransform(idx) {
+  const [r, c] = rc(idx);
+  return `translate(${c * 100}%, ${r * 100}%)`;
+}
+
+function buildPieces() {
+  piecesEl.innerHTML = '';
+  pieceEls = new Map();
+  for (let i = 0; i < match.board.length; i++) {
+    const v = match.board[i];
+    if (v === EMPTY) continue;
+    const el = document.createElement('div');
+    el.className = `piece p${v}`;
+    el.style.transform = pieceTransform(i);
+    const glyph = document.createElement('span');
+    glyph.textContent = HORSE[v];
+    el.appendChild(glyph);
+    piecesEl.appendChild(el);
+    pieceEls.set(i, el);
+  }
+}
+
+function clearHints() {
+  for (const cell of cellEls) cell.classList.remove('hint', 'hint-l', 'selected');
+}
+
+function renderHints() {
+  clearHints();
+  if (selected === null) return;
+  cellEls[selected].classList.add('selected');
+  for (const m of legal) {
+    cellEls[m.to].classList.add('hint');
+    if (m.kind !== SLIDE) cellEls[m.to].classList.add('hint-l');
+  }
+}
+
+function renderLastMove() {
+  for (const cell of cellEls) cell.classList.remove('last-from', 'last-to');
+  if (!lastMove) return;
+  cellEls[lastMove.from].classList.add('last-from');
+  cellEls[lastMove.to].classList.add('last-to');
+}
+
+function renderStatus() {
+  const puzzle = mode() === 'puzzle';
+  const tut = mode() === 'tutorial';
+  scoreEl.style.display = puzzle || tut ? 'none' : '';
+  puzzleBar.style.display = puzzle || tut ? '' : 'none';
+  diffSel.style.display = puzzle || tut ? 'none' : '';
+  undoBtn.style.display = puzzle || tut ? 'none' : '';
+
+  if (tut) {
+    const s = TUTORIAL[tutStep];
+    puzzleLabel.textContent = `${s.title} (${tutStep + 1}/${TUTORIAL.length})`;
+    puzzleGoal.textContent = s.text;
+  } else if (puzzle) {
+    const p = PUZZLES[puzzleIndex];
+    const check = solvedSet().has(p.id) ? ' ✓' : '';
+    puzzleLabel.textContent = `${p.title}${check} (${puzzleIndex + 1}/${PUZZLES.length})`;
+    const left = p.ownMoves - ownMovesUsed;
+    puzzleGoal.textContent = `${p.ownMoves}수 안에 오아시스 도착 — 남은 수 ${left}`;
+  } else {
+    roundLabel.textContent = `${match.roundNumber}라운드`;
+    for (const p of [P1, P2]) {
+      pipsEls[p].querySelectorAll('.pip').forEach((pip, i) => {
+        pip.classList.toggle(`won-${p}`, i < match.roundWins[p]);
+      });
+    }
+  }
+
+  const dot = `<span class="dot d${match.turn}"></span>`;
+  if (match.matchWinner !== null || match.roundWinner !== null) {
+    turnChip.innerHTML = '';
+    turnChip.style.display = 'none';
+    turnChip.classList.remove('thinking');
+    undoBtn.disabled = true;
+    return;
+  }
+  turnChip.style.display = '';
+  if (isAiTurn()) {
+    turnChip.classList.add('thinking');
+    turnChip.innerHTML = `${dot} AI 생각 중…`;
+  } else {
+    turnChip.classList.remove('thinking');
+    const name = match.turn === P1 ? '밤색 말' : '흰 말';
+    const who = mode() === '2p' ? `${name} 차례` : '내 차례';
+    turnChip.innerHTML = `${dot} ${who}`;
+  }
+
+  // 무르기 가능 여부
+  undoBtn.disabled = match.history.length === 0
+    || match.roundWinner !== null || isAiTurn();
+}
+
+function showBanner(text, btnLabel, onClick) {
+  bannerText.textContent = text;
+  bannerBtn.textContent = btnLabel;
+  bannerBtn.onclick = onClick;
+  banner.classList.add('show');
+}
+
+function hideBanner() {
+  banner.classList.remove('show');
+}
+
+function playerName(p) {
+  if (mode() === '2p') return p === P1 ? '밤색 말' : '흰 말';
+  const human = mode() === 'puzzle' ? puzzleHuman : P1;
+  return p === human ? '나' : 'AI';
+}
+
+function movePieceEl(move) {
+  const el = pieceEls.get(move.from);
+  el.style.transform = pieceTransform(move.to);
+  pieceEls.delete(move.from);
+  pieceEls.set(move.to, el);
+}
+
+function onRoundEnd(result) {
+  if (mode() === 'puzzle') {
+    const p = PUZZLES[puzzleIndex];
+    if (result.winner === puzzleHuman && ownMovesUsed <= p.ownMoves) {
+      markSolved(p.id);
+      sfx.win();
+      const last = puzzleIndex === PUZZLES.length - 1;
+      showBanner('🎉 퍼즐 성공!', last ? '처음부터' : '다음 퍼즐', () => {
+        puzzleIndex = last ? 0 : puzzleIndex + 1;
+        startPuzzle();
+      });
+    } else {
+      sfx.lose();
+      showBanner('상대가 먼저 도착했어요. 다시 도전!', '다시 시도', startPuzzle);
+    }
+    return;
+  }
+
+  if (result.matchOver) {
+    (result.winner === P1 || mode() === '2p' ? sfx.win : sfx.lose)();
+    showBanner(`🏆 ${playerName(result.winner)} 매치 승리!`, '새 매치', startMatch);
+  } else {
+    (result.winner === P1 || mode() === '2p' ? sfx.win : sfx.lose)();
+    showBanner(
+      `${playerName(result.winner)} ${match.roundNumber}라운드 승리! (오아시스 도착)`,
+      '다음 라운드',
+      () => {
+        match.nextRound();
+        startRoundUi();
+      },
+    );
+  }
+}
+
+function doMove(move) {
+  const mover = match.turn;
+  const result = match.play(move);
+  lastMove = move;
+  selected = null;
+  legal = [];
+
+  movePieceEl(move);
+  if (!result.roundOver) (move.kind === SLIDE ? sfx.slide : sfx.lmove)();
+
+  if (mode() === 'puzzle' && mover === puzzleHuman) ownMovesUsed += 1;
+
+  renderHints();
+  renderLastMove();
+  renderStatus();
+
+  if (mode() === 'tutorial') {
+    onTutorialMove(move);
+    return;
+  }
+
+  if (result.roundOver) {
+    onRoundEnd(result);
+    return;
+  }
+
+  // 퍼즐: 허용 수를 다 썼는데 승리하지 못함 → 실패
+  if (mode() === 'puzzle' && mover === puzzleHuman
+      && ownMovesUsed >= PUZZLES[puzzleIndex].ownMoves) {
+    sfx.lose();
+    showBanner(`${PUZZLES[puzzleIndex].ownMoves}수 안에 도착하지 못했어요.`, '다시 시도', startPuzzle);
+    return;
+  }
+
+  scheduleAi();
+}
+
+function onCellClick(idx) {
+  if (match.roundWinner !== null || match.matchWinner !== null) return;
+  if (isAiTurn()) return;
+
+  const v = match.board[idx];
+  if (v === match.turn) {
+    selected = idx;
+    legal = movesForPiece(match.board, idx);
+    renderHints();
+    return;
+  }
+  if (selected !== null) {
+    const move = legal.find((m) => m.to === idx);
+    if (move) {
+      doMove(move);
+      return;
+    }
+  }
+  selected = null;
+  legal = [];
+  renderHints();
+}
+
+function scheduleAi() {
+  if (!isAiTurn()) return;
+  renderStatus();
+  clearTimeout(aiTimer);
+  aiTimer = setTimeout(() => {
+    if (!isAiTurn()) return;
+    const move = bestMove(match.board, match.turn, aiOptions());
+    if (move) doMove(move);
+  }, 350);
+}
+
+// 무르기: 내 마지막 수(그리고 그 뒤의 AI 응수)를 되돌린다
+function undo() {
+  if (isAiTurn() || match.roundWinner !== null) return;
+  const steps = mode() === '2p' ? 1 : 2;
+  for (let i = 0; i < steps; i++) {
+    if (!match.undo()) break;
+  }
+  selected = null;
+  legal = [];
+  lastMove = match.history.length > 0 ? match.history[match.history.length - 1] : null;
+  buildPieces();
+  renderHints();
+  renderLastMove();
+  renderStatus();
+}
+
+function startRoundUi() {
+  hideBanner();
+  selected = null;
+  legal = [];
+  lastMove = null;
+  buildPieces();
+  renderHints();
+  renderLastMove();
+  renderStatus();
+  scheduleAi();
+}
+
+function startMatch() {
+  clearTimeout(aiTimer);
+  match = new Match();
+  startRoundUi();
+}
+
+function onTutorialMove(move) {
+  const step = TUTORIAL[tutStep];
+  if (step.check(move)) {
+    sfx.win();
+    if (tutStep === TUTORIAL.length - 1) {
+      showBanner('🎓 튜토리얼 완료! 이제 실전이에요.', 'AI와 대전', () => {
+        modeSel.value = 'ai';
+        startMatch();
+      });
+    } else {
+      showBanner('잘했어요!', '다음 단계', () => {
+        tutStep += 1;
+        startTutorial();
+      });
+    }
+  } else {
+    sfx.lose();
+    showBanner('목표와 다르게 움직였어요. 다시 해볼까요?', '다시 시도', startTutorial);
+  }
+}
+
+function startTutorial() {
+  clearTimeout(aiTimer);
+  match = new Match();
+  match.board.fill(0);
+  for (const [pos, player] of TUTORIAL[tutStep].pieces) {
+    match.board[fromNotation(pos)] = player;
+  }
+  match.turn = P1;
+  startRoundUi();
+}
+
+function startPuzzle() {
+  clearTimeout(aiTimer);
+  const p = PUZZLES[puzzleIndex];
+  match = new Match();
+  for (let i = 0; i < match.board.length; i++) {
+    match.board[i] = Number(p.board[i]);
+  }
+  match.turn = p.toMove;
+  puzzleHuman = p.toMove;
+  ownMovesUsed = 0;
+  startRoundUi();
+}
+
+function startCurrentMode() {
+  if (mode() === 'puzzle') startPuzzle();
+  else if (mode() === 'tutorial') { tutStep = 0; startTutorial(); }
+  else startMatch();
+}
+
+newBtn.addEventListener('click', startCurrentMode);
+modeSel.addEventListener('change', startCurrentMode);
+diffSel.addEventListener('change', () => {
+  if (mode() === 'ai') scheduleAi();
+});
+undoBtn.addEventListener('click', undo);
+prevPuzzleBtn.addEventListener('click', () => {
+  if (mode() === 'tutorial') {
+    tutStep = (tutStep - 1 + TUTORIAL.length) % TUTORIAL.length;
+    startTutorial();
+    return;
+  }
+  puzzleIndex = (puzzleIndex - 1 + PUZZLES.length) % PUZZLES.length;
+  startPuzzle();
+});
+nextPuzzleBtn.addEventListener('click', () => {
+  if (mode() === 'tutorial') {
+    tutStep = (tutStep + 1) % TUTORIAL.length;
+    startTutorial();
+    return;
+  }
+  puzzleIndex = (puzzleIndex + 1) % PUZZLES.length;
+  startPuzzle();
+});
+
+renderSoundBtn();
+startCurrentMode();
+</script>

@@ -1,0 +1,4 @@
+node_modules/
+xcuserdata/
+*.ipa
+.DS_Store
