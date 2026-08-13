@@ -7,21 +7,43 @@
 
 ---
 
-## STEP 1. Apple 준비물 확인 (10분)
+## STEP 1. Apple/GitHub 준비물 새로 만들기 (20분)
 
-**1-1. App Store Connect API 키** — [appstoreconnect.apple.com](https://appstoreconnect.apple.com)
-→ 사용자 및 액세스 → **통합(Integrations)** → App Store Connect API
+> which_combo 것을 재사용하지 않고 전부 새로 만드는 절차. (Team ID만 계정
+> 고유값이라 동일하다)
 
-- which_combo 때 만든 키가 목록에 있으면 그대로 재사용: **Key ID**와 **Issuer ID**를 메모.
-- ⚠️ p8 비밀키 파일은 생성 때 한 번만 다운로드된다. 로컬에 보관해둔 `AuthKey_XXXX.p8`
-  파일을 찾을 것. 못 찾겠으면 "키 생성"으로 새로 만들면 된다 (권한: App Manager).
+**1-1. App Store Connect API 키 새로 생성** — [appstoreconnect.apple.com](https://appstoreconnect.apple.com)
+→ 사용자 및 액세스 → **통합(Integrations)** → App Store Connect API → **API 키 생성(+)**
 
-**1-2. Team ID** — [developer.apple.com/account](https://developer.apple.com/account)
+- 이름: `run-horses-ci` / 액세스 권한: **App Manager**
+- 생성 직후 화면에서 ① **Issuer ID**(상단, 팀 공통 UUID) ② 방금 만든 키의
+  **Key ID** 메모, ③ **API 키 다운로드** 클릭 → `AuthKey_XXXXXXXX.p8` 저장
+- ⚠️ p8 다운로드 버튼은 **한 번만** 나타난다. 지금 바로 안전한 곳에 보관할 것.
+
+**1-2. Team ID 확인** — [developer.apple.com/account](https://developer.apple.com/account)
 → Membership details → **Team ID** (10자리) 메모.
 
-**1-3. match 인증서 저장소** — which_combo의 fastlane match가 쓰던
-**private 저장소 URL**(예: `https://github.com/sangmin082/certificates`)과
-**MATCH_PASSWORD**(인증서 암호화 비밀번호)를 그대로 재사용한다.
+**1-3. 인증서 저장소(match repo) 새로 생성** — GitHub에서
+**New repository** → 이름 `run-horses-certificates` → **Private** ✅ → Create.
+(README 등 아무것도 추가하지 않은 빈 저장소면 된다. fastlane match가 여기에
+배포 인증서와 프로비저닝 프로파일을 암호화해 저장한다)
+
+**1-4. MATCH_PASSWORD 정하기** — 인증서 암호화에 쓸 비밀번호를 새로 정한다
+(아무 문자열이나 가능, 예: 비밀번호 관리자로 생성). 어딘가에 보관해 둘 것 —
+나중에 다른 기계에서 인증서를 복호화할 때 필요하다.
+
+**1-5. GitHub PAT(토큰) 새로 생성** — GitHub → Settings → Developer settings →
+Personal access tokens → **Fine-grained tokens** → Generate new token
+
+- Repository access: **Only select repositories** → `run-horses-certificates` 선택
+- Permissions → Repository permissions → **Contents: Read and write**
+- 만료 기간은 편한 대로 (만료되면 Secrets만 갱신하면 된다)
+- 생성된 `github_pat_...` 문자열 메모
+
+> 참고: Apple 배포 인증서(iOS Distribution)는 팀당 최대 2~3개다. which_combo의
+> match가 이미 인증서를 만들었으므로, 새 저장소로 match를 돌리면 인증서를 하나 더
+> 만들려고 시도한다. 한도 초과 오류("maximum number of certificates")가 나면
+> Claude에게 알릴 것 — which_combo 인증서 재사용 또는 기존 인증서 정리로 해결한다.
 
 ## STEP 2. 번들 ID 등록 (3분)
 
@@ -48,13 +70,11 @@ New repository secret으로 7개 등록:
 |---|---|
 | `APP_STORE_CONNECT_KEY_ID` | STEP 1-1의 Key ID |
 | `APP_STORE_CONNECT_ISSUER_ID` | STEP 1-1의 Issuer ID |
-| `APP_STORE_CONNECT_KEY` | p8 파일 내용 전체 (원문/base64 모두 허용) |
+| `APP_STORE_CONNECT_KEY` | p8 파일을 텍스트 편집기로 열어 내용 전체 붙여넣기 (`-----BEGIN PRIVATE KEY-----`부터 끝까지) |
 | `APPLE_TEAM_ID` | STEP 1-2의 Team ID |
-| `MATCH_GIT_URL` | 인증서 저장소 https URL |
-| `MATCH_GIT_BASIC_AUTHORIZATION` | `깃허브계정:PAT` (PAT 단독도 허용) |
-| `MATCH_PASSWORD` | which_combo와 동일한 match 비밀번호 |
-
-> PAT은 인증서 저장소에 read/write 권한이 있어야 한다 (which_combo 때 쓰던 것 재사용).
+| `MATCH_GIT_URL` | `https://github.com/<계정>/run-horses-certificates` |
+| `MATCH_GIT_BASIC_AUTHORIZATION` | STEP 1-5의 PAT (`github_pat_...` 단독으로 넣으면 됨) |
+| `MATCH_PASSWORD` | STEP 1-4에서 정한 비밀번호 |
 
 ## STEP 5. PR 머지
 
