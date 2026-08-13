@@ -23,27 +23,25 @@
 **1-2. Team ID 확인** — [developer.apple.com/account](https://developer.apple.com/account)
 → Membership details → **Team ID** (10자리) 메모.
 
-**1-3. 인증서 저장소(match repo) 새로 생성** — GitHub에서
-**New repository** → 이름 `run-horses-certificates` → **Private** ✅ → Create.
-(README 등 아무것도 추가하지 않은 빈 저장소면 된다. fastlane match가 여기에
-배포 인증서와 프로비저닝 프로파일을 암호화해 저장한다)
+**1-3. 인증서 저장소 — 공유 저장소 `ios-certificates` 사용** —
+앱마다 저장소를 만들지 않고 하나의 private 저장소를 모든 앱이 공유한다.
+match는 같은 저장소의 **배포 인증서는 재사용**하고, 앱(번들 ID)별
+프로비저닝 프로파일만 추가하므로 인증서 개수 한도 걱정이 없다.
 
-**1-4. MATCH_PASSWORD 정하기** — 인증서 암호화에 쓸 비밀번호를 새로 정한다
-(아무 문자열이나 가능, 예: 비밀번호 관리자로 생성). 어딘가에 보관해 둘 것 —
-나중에 다른 기계에서 인증서를 복호화할 때 필요하다.
+- GitHub에 `ios-certificates` **Private** 저장소가 없으면 새로 생성 (빈 저장소면 됨)
+- 이미 있으면 그대로 사용
+
+**1-4. MATCH_PASSWORD** — `ios-certificates` 저장소의 인증서를 암호화할 때
+쓴(쓸) 비밀번호. **저장소에 이미 인증서가 들어 있다면 그때 정한 비밀번호를
+그대로 써야 한다** (다르면 복호화 실패). 빈 저장소라면 새로 정해서 보관.
 
 **1-5. GitHub PAT(토큰) 새로 생성** — GitHub → Settings → Developer settings →
 Personal access tokens → **Fine-grained tokens** → Generate new token
 
-- Repository access: **Only select repositories** → `run-horses-certificates` 선택
+- Repository access: **Only select repositories** → `ios-certificates` 선택
 - Permissions → Repository permissions → **Contents: Read and write**
 - 만료 기간은 편한 대로 (만료되면 Secrets만 갱신하면 된다)
 - 생성된 `github_pat_...` 문자열 메모
-
-> 참고: Apple 배포 인증서(iOS Distribution)는 팀당 최대 2~3개다. which_combo의
-> match가 이미 인증서를 만들었으므로, 새 저장소로 match를 돌리면 인증서를 하나 더
-> 만들려고 시도한다. 한도 초과 오류("maximum number of certificates")가 나면
-> Claude에게 알릴 것 — which_combo 인증서 재사용 또는 기존 인증서 정리로 해결한다.
 
 ## STEP 2. 번들 ID 등록 (3분)
 
@@ -72,7 +70,7 @@ New repository secret으로 7개 등록:
 | `APP_STORE_CONNECT_ISSUER_ID` | STEP 1-1의 Issuer ID |
 | `APP_STORE_CONNECT_KEY` | p8 파일을 텍스트 편집기로 열어 내용 전체 붙여넣기 (`-----BEGIN PRIVATE KEY-----`부터 끝까지) |
 | `APPLE_TEAM_ID` | STEP 1-2의 Team ID |
-| `MATCH_GIT_URL` | `https://github.com/<계정>/run-horses-certificates` |
+| `MATCH_GIT_URL` | `https://github.com/<계정>/ios-certificates` |
 | `MATCH_GIT_BASIC_AUTHORIZATION` | STEP 1-5의 PAT (`github_pat_...` 단독으로 넣으면 됨) |
 | `MATCH_PASSWORD` | STEP 1-4에서 정한 비밀번호 |
 
