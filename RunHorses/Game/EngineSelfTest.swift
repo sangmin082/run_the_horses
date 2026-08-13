@@ -123,11 +123,11 @@ enum EngineSelfTest {
         try expect(overshoot.contains { GameEngine.cellName($0.to) == "a6" }, "반대편 끝까지")
     }
 
-    // MARK: 매치 흐름 (3판 2선승, 선공 교대)
+    // MARK: 매치 흐름 (단판 — 오아시스 도착 즉시 매치 승리)
 
     static func testMatchFlow() throws {
         var engine = GameEngine()
-        try expect(engine.roundNumber == 1 && engine.turn == .first, "1라운드 밤색 선공")
+        try expect(engine.roundNumber == 1 && engine.turn == .first, "시작은 밤색 선공")
 
         // 잘못된 수 거부
         do {
@@ -137,7 +137,7 @@ enum EngineSelfTest {
             try expect(error == .notYourTurn, "notYourTurn")
         }
 
-        // 커스텀 포지션으로 라운드 승리 → 라운드 전환 검증
+        // 커스텀 포지션으로 승리 → 단판이므로 즉시 매치 종료
         var custom = emptyBoard()
         custom[idx("e6")] = 2
         custom[idx("k6")] = 1
@@ -145,9 +145,14 @@ enum EngineSelfTest {
         var round = GameEngine(customBoard: custom, turn: .first)
         let win = round.legalMoves(for: .first).first { $0.to == GameEngine.center }!
         let outcome = try round.apply(win, by: .first)
-        try expect(outcome == .roundWon(player: .first, round: 1, wins: [1, 0]), "라운드 승리 판정")
-        try round.startNextRound()
-        try expect(round.roundNumber == 2 && round.turn == .second, "2라운드 흰색 선공")
+        try expect(outcome == .matchWon(player: .first, wins: [1, 0]), "단판 승리 = 매치 승리")
+        try expect(round.isFinished, "매치 종료 상태")
+        do {
+            try round.startNextRound()
+            try expect(false, "종료된 매치에서 다음 라운드는 거부해야 함")
+        } catch let error as EngineError {
+            try expect(error == .matchFinished, "matchFinished")
+        }
     }
 
     // MARK: 무르기

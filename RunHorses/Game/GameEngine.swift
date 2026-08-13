@@ -47,8 +47,10 @@ struct GameEngine {
     static let boardSize = 11
     static let cellCount = 121
     static let center = 60 // f6
-    static let totalRounds = 3
-    static let winsNeeded = 2
+    // 단판 승부 — 오아시스에 먼저 도착하면 그대로 매치 승리.
+    // (원작은 3판 2선승이지만 앱은 단판을 채택. 되돌리려면 3/2로만 바꾸면 된다)
+    static let totalRounds = 1
+    static let winsNeeded = 1
 
     enum Terrain {
         case desert

@@ -51,15 +51,7 @@ struct GameView: View {
             HStack(alignment: .center) {
                 sideColumn(player: .first, alignment: .leading)
                 Spacer()
-                VStack(spacing: 3) {
-                    Text("\(min(viewModel.engine.roundNumber, GameEngine.totalRounds))")
-                        .font(.system(size: 26, weight: .black))
-                        .foregroundStyle(Theme.ink)
-                    Text("라운드")
-                        .font(.system(size: 10, weight: .semibold))
-                        .kerning(2)
-                        .foregroundStyle(Theme.inkGhost)
-                }
+                DiamondMark(filled: true, size: 8)
                 Spacer()
                 sideColumn(player: .second, alignment: .trailing)
             }
@@ -87,31 +79,23 @@ struct GameView: View {
         let isMe = player == viewModel.localPlayer
         let name = viewModel.isSolo ? (isMe ? "나" : "AI") : "\(player.label) 말"
         let active = viewModel.engine.turn == player && viewModel.engine.isRoundRunning
-        return VStack(alignment: alignment, spacing: 7) {
+        return VStack(alignment: alignment, spacing: 6) {
             HStack(spacing: 8) {
                 if alignment == .leading {
-                    PieceToken(player: player, size: 26)
+                    PieceToken(player: player, size: 28)
                     Text(name)
-                        .font(.system(size: 14, weight: active ? .bold : .medium))
+                        .font(.system(size: 15, weight: active ? .bold : .medium))
                         .foregroundStyle(active ? Theme.ink : Theme.inkFaint)
                 } else {
                     Text(name)
-                        .font(.system(size: 14, weight: active ? .bold : .medium))
+                        .font(.system(size: 15, weight: active ? .bold : .medium))
                         .foregroundStyle(active ? Theme.ink : Theme.inkFaint)
-                    PieceToken(player: player, size: 26)
+                    PieceToken(player: player, size: 28)
                 }
             }
-            HStack(spacing: 7) {
-                ForEach(0..<GameEngine.winsNeeded, id: \.self) { i in
-                    DiamondMark(filled: i < viewModel.engine.roundWins[player.rawValue], size: 8)
-                }
-                if active {
-                    Circle()
-                        .fill(Theme.gold)
-                        .frame(width: 5, height: 5)
-                        .padding(.leading, 2)
-                }
-            }
+            Circle()
+                .fill(active ? Theme.gold : .clear)
+                .frame(width: 5, height: 5)
         }
     }
 
@@ -299,18 +283,27 @@ struct GameView: View {
         let wins = viewModel.engine.roundWins
         switch overlay {
         case .roundWon(let mine, let round):
+            // 단판 규칙에서는 도달하지 않는 경로 (엔진의 라운드제 지원 흔적)
             return OverlayContent(
                 headline: mine ? "\(round)라운드 승리" : "\(round)라운드 패배",
                 accent: mine,
-                subtitle: "오아시스 도착 — 라운드 점수 \(wins[0]) : \(wins[1])",
+                subtitle: "라운드 점수 \(wins[0]) : \(wins[1])",
                 button: "다음 라운드",
                 action: { viewModel.startNextRound() }
             )
         case .matchWon(let mine):
+            let subtitle: String
+            if viewModel.resigned {
+                subtitle = "기권했습니다."
+            } else if mine {
+                subtitle = "오아시스에 먼저 도착했습니다."
+            } else {
+                subtitle = "\(viewModel.opponentName)가 먼저 도착했습니다."
+            }
             return OverlayContent(
                 headline: mine ? "승리" : "패배",
                 accent: mine,
-                subtitle: "최종 라운드 점수 \(wins[0]) : \(wins[1])",
+                subtitle: subtitle,
                 button: "나가기",
                 action: { dismiss() }
             )

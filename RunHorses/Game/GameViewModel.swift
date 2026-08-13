@@ -64,6 +64,7 @@ final class GameViewModel {
     private(set) var puzzleMovesUsed = 0
     /// 칸 → 말 고유 ID (이동 애니메이션이 같은 말을 추적하도록)
     private(set) var pieceIDs: [Int: Int] = [:]
+    private(set) var resigned = false
     private var nextPieceID = 0
     var opponentLeft = false
     private var statsRecorded = false
@@ -100,8 +101,9 @@ final class GameViewModel {
         switch mode {
         case .solo(let difficulty):
             engine = GameEngine()
-            localPlayer = .first
-            ai = AIPlayer(difficulty: difficulty, me: .second)
+            // 단판이라 선공 유불리가 그대로 승부가 된다 — 선공은 무작위 배정
+            localPlayer = Bool.random() ? .first : .second
+            ai = AIPlayer(difficulty: difficulty, me: localPlayer.opponent)
 
         case .online(let client):
             engine = GameEngine()
@@ -184,6 +186,7 @@ final class GameViewModel {
     func resign() {
         guard engine.isRoundRunning else { return }
         cancelAllWork()
+        resigned = true
         overlay = .matchWon(mine: false)
         recordStatsIfNeeded(winner: localPlayer.opponent)
         if case .online(let client) = mode { client.close() }

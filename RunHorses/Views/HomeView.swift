@@ -175,13 +175,9 @@ struct HomeView: View {
     }
 
     private var footer: some View {
-        HStack(spacing: 10) {
-            HStack(spacing: 4) {
-                DiamondMark(filled: true, size: 6)
-                DiamondMark(filled: true, size: 6)
-                DiamondMark(filled: false, size: 6)
-            }
-            Text("3판 2선승 · 라운드마다 선공 교대")
+        HStack(spacing: 8) {
+            DiamondMark(filled: true, size: 6)
+            Text("단판 승부 · 먼저 도착하면 승리")
                 .font(.system(size: 11))
                 .foregroundStyle(Theme.inkGhost)
         }
