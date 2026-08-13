@@ -1,18 +1,46 @@
-# run_the_horses
+# 말달리자 (Run the Horses)
 
-데스게임 7회차 <말 달리자>를 모바일(앱스토어) 게임으로 만드는 프로젝트.
+데스게임 7회차 <말 달리자>를 iOS 게임으로 구현한 프로젝트입니다.
+([which_combo](https://github.com/sangmin082/which_combo)와 같은 구조 — SwiftUI 앱 + Node.js 릴레이 서버)
 
-- 개발 계획: [PLAN.md](PLAN.md)
-- 밸런스 실험: [docs/balance-report.md](docs/balance-report.md)
+- **혼자 하기** — AI와 오아시스 경주 (난이도 4단계, 전문가는 깊이 9 수읽기)
+- **둘이 하기** — 방 코드 하나로 친구와 실시간 온라인 대전
+- **튜토리얼 / 퍼즐** — 3단계 행마법 학습 + "N수 안에 도착" 12문제
+
+개발 문서: [PLAN.md](PLAN.md) · [규칙 명세](docs/rules-spec.md) ·
+[밸런스 실험](docs/balance-report.md) · [팬게임 비교](docs/competitor-analysis.md) ·
+[앱스토어 제출 자료](docs/APP_STORE.md) · [오너 TODO](docs/owner-todo.md)
 
 ## 구성
 
 ```
-engine/src/   룰 엔진 + AI (의존성 없는 순수 JS, ESM) — 이후 Dart/네이티브 포팅의 기준 구현
-engine/test/  단위 테스트 (node:test)
-tools/        밸런스 시뮬레이션, 퍼즐 생성기, 웹 번들 빌드
-web/          플레이 가능한 웹 프로토타입 (AI 대전 / 2인 대전 / 튜토리얼 / 퍼즐)
+RunHorses.xcodeproj          Xcode 16+ 프로젝트 (iOS 17+)
+RunHorses/
+├── App/RunHorsesApp.swift
+├── Game/
+│   ├── GameEngine.swift     규칙 상태기계 (순수 값 타입 — 양쪽 기기에서 동일 재현)
+│   ├── AIPlayer.swift       네가맥스+알파베타+TT+반복심화 AI (4단계 난이도)
+│   ├── GameViewModel.swift  대국 진행, AI 스케줄, 튜토리얼/퍼즐 판정, 무르기
+│   ├── Puzzles.swift        퍼즐 데이터 (tools/gen-puzzles.js가 자동 생성)
+│   ├── StatsStore.swift     전적·퍼즐 기록 저장
+│   └── EngineSelfTest.swift JS 레퍼런스와 동일 시나리오의 규칙 검증 (DEBUG)
+├── Online/RoomClient.swift  WebSocket 클라이언트 (방 생성/코드 입장/무브 릴레이)
+└── Views/                   홈, 대국(11×11 보드), 튜토리얼·퍼즐, 온라인 로비, 규칙, 전적
+server/                      2인용 릴레이 서버 (Node.js + ws, Render 배포)
+engine/                      JS 레퍼런스 룰 엔진 + 단위 테스트 30개 (포팅 검증 기준)
+tools/                       밸런스 시뮬레이션, 퍼즐 생성기, 웹 번들 빌드, 아이콘 생성
+web/                         웹 프로토타입 (AI 대전 / 2인 대전 / 튜토리얼 / 퍼즐)
 ```
+
+## iOS 앱 실행 (Xcode 16 이상, iOS 17+)
+
+```bash
+open RunHorses.xcodeproj
+```
+
+TestFlight 배포는 GitHub Actions `TestFlight` 워크플로가 담당한다
+(필요한 Secrets는 `fastlane/Fastfile` 상단 주석 참고).
+온라인 대전 서버는 `render.yaml`로 Render에 배포한다.
 
 ## 실행
 

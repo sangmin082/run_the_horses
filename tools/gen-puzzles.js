@@ -101,7 +101,33 @@ const main = async () => {
 export const PUZZLES = ${JSON.stringify(puzzles, null, 2)};
 `;
   writeFileSync(join(root, 'web/puzzles.js'), out);
-  console.log(`1수 퍼즐 ${oneMovers.length}개, 2수 퍼즐 ${twoMovers.length}개 → web/puzzles.js (자가대전 ${game}게임 탐색)`);
+
+  // iOS 앱용 Swift 데이터도 함께 생성한다 (동일한 퍼즐 세트 유지)
+  const swiftEntries = puzzles.map((p) => `        Puzzle(id: "${p.id}", title: "${p.title}", board: "${p.board}", toMove: ${p.toMove === 1 ? '.first' : '.second'}, ownMoves: ${p.ownMoves}),`).join('\n');
+  const swift = `// 자동 생성 파일 — tools/gen-puzzles.js (시드 ${seed}). 직접 수정하지 말 것.
+import Foundation
+
+/// 퍼즐 한 문제 — board는 121글자(0=빈칸, 1=밤색 말, 2=흰 말)
+struct Puzzle: Identifiable {
+    let id: String
+    let title: String
+    let board: String
+    let toMove: Player
+    let ownMoves: Int
+
+    var boardArray: [Int8] {
+        board.map { Int8(String($0)) ?? 0 }
+    }
+}
+
+enum Puzzles {
+    static let all: [Puzzle] = [
+${swiftEntries}
+    ]
+}
+`;
+  writeFileSync(join(root, 'RunHorses/Game/Puzzles.swift'), swift);
+  console.log(`1수 퍼즐 ${oneMovers.length}개, 2수 퍼즐 ${twoMovers.length}개 → web/puzzles.js + RunHorses/Game/Puzzles.swift (자가대전 ${game}게임 탐색)`);
 };
 
 main();
