@@ -19,6 +19,12 @@
 4. **Render에 서버 배포** — render.com → New → Blueprint → 이 저장소 연결
    (배포 주소가 `run-horses.onrender.com`이 아니면 `RunHorses/Online/OnlineConfig.swift` 수정)
 
+## 현재 상태 (2026-08-14)
+
+TestFlight 배포 파이프라인 가동 중 (빌드 4까지 업로드), 서버 배포 완료.
+**남은 것은 ① 실기기 최종 테스트 ② 스크린샷 5장 ③ 심사 제출 클릭**뿐이며,
+전 과정은 `docs/APP_STORE.md` §7~§9에 클릭 단위로 정리되어 있다.
+
 ## 출시 전 확인
 
 5. **원작 7화로 보드 최종 확인** — 현재 구현(초원 12칸 다이아몬드 + 코너 ㄱ자
