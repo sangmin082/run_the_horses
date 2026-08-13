@@ -12,55 +12,19 @@ struct HomeView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                LinearGradient(colors: [Color(red: 0.13, green: 0.09, blue: 0.05),
-                                        Color(red: 0.27, green: 0.17, blue: 0.08)],
-                               startPoint: .top, endPoint: .bottom)
-                    .ignoresSafeArea()
+                Theme.bg.ignoresSafeArea()
+                backdrop
 
-                VStack(spacing: 36) {
-                    Spacer()
-
-                    VStack(spacing: 10) {
-                        Text("🐎")
-                            .font(.system(size: 72))
-                        Text("말달리자")
-                            .font(.system(size: 46, weight: .black, design: .serif))
-                            .foregroundStyle(.white)
-                        Text("DEATH GAME — RUN THE HORSES")
-                            .font(.caption.weight(.semibold))
-                            .kerning(2)
-                            .foregroundStyle(Color(red: 1.0, green: 0.78, blue: 0.25).opacity(0.85))
-                    }
-
-                    VStack(spacing: 13) {
-                        menuButton("혼자 하기", subtitle: "AI와 오아시스 경주 (난이도 4단계)", icon: "person.fill") {
-                            showDifficultyDialog = true
-                        }
-                        menuButton("둘이 하기", subtitle: "방을 만들고 코드로 초대", icon: "person.2.fill") {
-                            showOnlineLobby = true
-                        }
-                        menuButton("튜토리얼", subtitle: "3단계로 배우는 행마법", icon: "graduationcap.fill") {
-                            tutorialGame = GameViewModel(mode: .tutorial)
-                        }
-                        menuButton("퍼즐", subtitle: "N수 안에 오아시스 도착", icon: "puzzlepiece.fill") {
-                            showPuzzles = true
-                        }
-                        menuButton("전적", subtitle: "승패 기록 보기", icon: "chart.bar.fill") {
-                            showStats = true
-                        }
-                        menuButton("게임 방법", subtitle: "규칙 읽기", icon: "book.fill") {
-                            showRules = true
-                        }
-                    }
-                    .padding(.horizontal, 32)
-
-                    Spacer()
-
-                    Text("정중앙 오아시스에 먼저 도착하면 승리 · 3판 2선승")
-                        .font(.caption2)
-                        .foregroundStyle(.white.opacity(0.4))
-                        .padding(.bottom, 8)
+                VStack(alignment: .leading, spacing: 0) {
+                    Spacer(minLength: 24)
+                    wordmark
+                    Spacer(minLength: 24)
+                    menu
+                    Spacer(minLength: 20)
+                    footer
                 }
+                .padding(.horizontal, 28)
+                .padding(.bottom, 12)
             }
             .confirmationDialog("AI 난이도", isPresented: $showDifficultyDialog, titleVisibility: .visible) {
                 ForEach(AIPlayer.Difficulty.allCases) { difficulty in
@@ -75,40 +39,153 @@ struct HomeView: View {
             .fullScreenCover(item: $tutorialGame) { game in
                 GameView(viewModel: game)
             }
-            .sheet(isPresented: $showPuzzles) {
-                PuzzlesView()
-            }
-            .sheet(isPresented: $showRules) {
-                RulesView()
-            }
-            .sheet(isPresented: $showOnlineLobby) {
-                OnlineLobbyView()
-            }
-            .sheet(isPresented: $showStats) {
-                StatsView()
-            }
+            .sheet(isPresented: $showPuzzles) { PuzzlesView() }
+            .sheet(isPresented: $showRules) { RulesView() }
+            .sheet(isPresented: $showOnlineLobby) { OnlineLobbyView() }
+            .sheet(isPresented: $showStats) { StatsView() }
         }
+        .tint(Theme.gold)
         .preferredColorScheme(.dark)
     }
 
-    private func menuButton(_ title: String, subtitle: String, icon: String,
-                            action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 14) {
-                Image(systemName: icon)
-                    .font(.title3)
-                    .frame(width: 32)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title).font(.headline)
-                    Text(subtitle).font(.caption).opacity(0.6)
+    // MARK: 배경 장식 — 오아시스 동심원과 커다란 말 실루엣
+
+    private var backdrop: some View {
+        GeometryReader { proxy in
+            ZStack {
+                // 우상단: 오아시스 파문
+                ZStack {
+                    ForEach(0..<3, id: \.self) { ring in
+                        Circle()
+                            .stroke(Theme.oasis.opacity(0.16 - Double(ring) * 0.04),
+                                    lineWidth: 1.5)
+                            .frame(width: 140 + CGFloat(ring) * 90)
+                    }
+                    Circle()
+                        .fill(Theme.oasis.opacity(0.18))
+                        .frame(width: 54)
                 }
-                Spacer()
-                Image(systemName: "chevron.right").font(.caption).opacity(0.5)
+                .position(x: proxy.size.width - 40, y: 110)
+
+                // 좌하단: 밤에 잠긴 말 실루엣
+                Text("♞")
+                    .font(.system(size: 460))
+                    .foregroundStyle(Color.black.opacity(0.35))
+                    .rotationEffect(.degrees(-8))
+                    .position(x: 90, y: proxy.size.height - 130)
             }
-            .foregroundStyle(.white)
-            .padding()
-            .background(RoundedRectangle(cornerRadius: 14).fill(.white.opacity(0.08)))
         }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+    }
+
+    // MARK: 워드마크
+
+    private var wordmark: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 8) {
+                DiamondMark(filled: true, size: 7)
+                Text("DEATH GAME ORIGINAL")
+                    .font(.system(size: 11, weight: .semibold))
+                    .kerning(3)
+                    .foregroundStyle(Theme.inkFaint)
+            }
+
+            Text("말달리자")
+                .font(.system(size: 58, weight: .black))
+                .kerning(-1)
+                .foregroundStyle(Theme.ink)
+
+            Rectangle()
+                .fill(Theme.gold)
+                .frame(width: 44, height: 3)
+
+            Text("사막을 가로질러, 정중앙의 오아시스에\n먼저 도착하는 말이 승리한다.")
+                .font(.system(size: 15))
+                .lineSpacing(4)
+                .foregroundStyle(Theme.inkFaint)
+        }
+    }
+
+    // MARK: 메뉴 — 주 액션 하나만 강조하고 나머지는 조용하게
+
+    private var menu: some View {
+        VStack(spacing: 12) {
+            Button {
+                showDifficultyDialog = true
+            } label: {
+                HStack {
+                    Text("혼자 하기")
+                        .font(.system(size: 18, weight: .bold))
+                    Spacer()
+                    Text("AI 난이도 4단계")
+                        .font(.system(size: 12, weight: .medium))
+                        .opacity(0.7)
+                }
+                .foregroundStyle(Theme.bg)
+                .padding(.horizontal, 20)
+                .frame(height: 58)
+                .background(RoundedRectangle(cornerRadius: 14).fill(Theme.gold))
+            }
+
+            Button {
+                showOnlineLobby = true
+            } label: {
+                HStack {
+                    Text("둘이 하기")
+                        .font(.system(size: 18, weight: .bold))
+                    Spacer()
+                    Text("방 코드로 초대")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Theme.inkFaint)
+                }
+                .foregroundStyle(Theme.ink)
+                .padding(.horizontal, 20)
+                .frame(height: 58)
+                .background(
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(Theme.bgRaised)
+                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.hairline, lineWidth: 1))
+                )
+            }
+
+            HStack(spacing: 12) {
+                quietTile("튜토리얼") { tutorialGame = GameViewModel(mode: .tutorial) }
+                quietTile("퍼즐") { showPuzzles = true }
+            }
+            HStack(spacing: 12) {
+                quietTile("전적") { showStats = true }
+                quietTile("게임 방법") { showRules = true }
+            }
+        }
+    }
+
+    private func quietTile(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Theme.ink.opacity(0.85))
+                .frame(maxWidth: .infinity)
+                .frame(height: 46)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Theme.hairline, lineWidth: 1)
+                )
+        }
+    }
+
+    private var footer: some View {
+        HStack(spacing: 10) {
+            HStack(spacing: 4) {
+                DiamondMark(filled: true, size: 6)
+                DiamondMark(filled: true, size: 6)
+                DiamondMark(filled: false, size: 6)
+            }
+            Text("3판 2선승 · 라운드마다 선공 교대")
+                .font(.system(size: 11))
+                .foregroundStyle(Theme.inkGhost)
+        }
+        .frame(maxWidth: .infinity, alignment: .center)
     }
 }
 

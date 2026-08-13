@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 대국 화면 — 11×11 보드, 라운드 점수, 안내 배너.
+/// 대국 화면 — 11×11 보드, 라운드 점수, 안내.
 /// 1인용/온라인/튜토리얼/퍼즐 모두 이 화면을 사용한다.
 struct GameView: View {
     @State var viewModel: GameViewModel
@@ -9,35 +9,27 @@ struct GameView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showResignAlert = false
 
-    private enum Palette {
-        static let backgroundTop = Color(red: 0.13, green: 0.09, blue: 0.05)
-        static let backgroundBottom = Color(red: 0.24, green: 0.15, blue: 0.07)
-        static let desert = Color(red: 0.91, green: 0.81, blue: 0.53)
-        static let desertAlt = Color(red: 0.87, green: 0.76, blue: 0.46)
-        static let meadow = Color(red: 0.56, green: 0.70, blue: 0.42)
-        static let oasis = Color(red: 0.23, green: 0.58, blue: 0.65)
-        static let firstPiece = Color(red: 0.33, green: 0.20, blue: 0.11)
-        static let secondPiece = Color(red: 0.96, green: 0.93, blue: 0.86)
-        static let accent = Color(red: 1.0, green: 0.78, blue: 0.25)
-    }
-
     var body: some View {
         ZStack {
-            LinearGradient(colors: [Palette.backgroundTop, Palette.backgroundBottom],
-                           startPoint: .top, endPoint: .bottom)
-                .ignoresSafeArea()
+            Theme.bg.ignoresSafeArea()
 
-            VStack(spacing: 12) {
+            VStack(spacing: 0) {
                 header
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
                 banner
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 14)
                 board
+                    .padding(.horizontal, 14)
                 Spacer(minLength: 0)
                 bottomBar
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 6)
             }
-            .padding()
 
-            if let overlay = viewModel.overlay {
-                overlayView(overlay)
+            if viewModel.overlay != nil {
+                overlayView
             }
         }
         .navigationBarBackButtonHidden(true)
@@ -51,74 +43,85 @@ struct GameView: View {
         }
     }
 
-    // MARK: 상단 — 점수/단계 표시
+    // MARK: 상단 — 스코어보드 (박스 없이 타이포그래피로)
 
     @ViewBuilder
     private var header: some View {
         if viewModel.showsMatchScore {
-            HStack(spacing: 12) {
-                playerBadge(player: .first)
-                VStack(spacing: 2) {
-                    Text("\(min(viewModel.engine.roundNumber, GameEngine.totalRounds))라운드")
-                        .font(.caption2)
-                        .foregroundStyle(.white.opacity(0.6))
-                    Text("3판 2선승")
-                        .font(.caption.bold())
-                        .foregroundStyle(.white.opacity(0.85))
+            HStack(alignment: .center) {
+                sideColumn(player: .first, alignment: .leading)
+                Spacer()
+                VStack(spacing: 3) {
+                    Text("\(min(viewModel.engine.roundNumber, GameEngine.totalRounds))")
+                        .font(.system(size: 26, weight: .black))
+                        .foregroundStyle(Theme.ink)
+                    Text("라운드")
+                        .font(.system(size: 10, weight: .semibold))
+                        .kerning(2)
+                        .foregroundStyle(Theme.inkGhost)
                 }
-                playerBadge(player: .second)
+                Spacer()
+                sideColumn(player: .second, alignment: .trailing)
             }
         } else if let step = viewModel.currentTutorialStep {
-            Text("\(step.title)  (\(viewModel.tutorialStep + 1)/\(GameViewModel.tutorialSteps.count))")
-                .font(.headline)
-                .foregroundStyle(.white)
+            titleHeader(step.title,
+                        detail: "\(viewModel.tutorialStep + 1) / \(GameViewModel.tutorialSteps.count)")
         } else if let puzzle = viewModel.currentPuzzle {
-            Text(puzzle.title)
-                .font(.headline)
-                .foregroundStyle(.white)
+            titleHeader(puzzle.title, detail: "\(puzzle.ownMoves)수 퍼즐")
         }
     }
 
-    private func playerBadge(player: Player) -> some View {
+    private func titleHeader(_ title: String, detail: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Text(title)
+                .font(.system(size: 22, weight: .black))
+                .foregroundStyle(Theme.ink)
+            Text(detail)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Theme.inkFaint)
+            Spacer()
+        }
+    }
+
+    private func sideColumn(player: Player, alignment: HorizontalAlignment) -> some View {
         let isMe = player == viewModel.localPlayer
-        let name = viewModel.isSolo || viewModel.currentPuzzle != nil
-            ? (isMe ? "나" : viewModel.opponentName)
-            : "\(player.label) 말"
+        let name = viewModel.isSolo ? (isMe ? "나" : "AI") : "\(player.label) 말"
         let active = viewModel.engine.turn == player && viewModel.engine.isRoundRunning
-        return VStack(spacing: 6) {
-            HStack(spacing: 6) {
-                Text(player.horseGlyph)
-                Text(name).font(.caption.bold()).lineLimit(1)
+        return VStack(alignment: alignment, spacing: 7) {
+            HStack(spacing: 8) {
+                if alignment == .leading {
+                    PieceToken(player: player, size: 26)
+                    Text(name)
+                        .font(.system(size: 14, weight: active ? .bold : .medium))
+                        .foregroundStyle(active ? Theme.ink : Theme.inkFaint)
+                } else {
+                    Text(name)
+                        .font(.system(size: 14, weight: active ? .bold : .medium))
+                        .foregroundStyle(active ? Theme.ink : Theme.inkFaint)
+                    PieceToken(player: player, size: 26)
+                }
             }
-            HStack(spacing: 5) {
+            HStack(spacing: 7) {
                 ForEach(0..<GameEngine.winsNeeded, id: \.self) { i in
+                    DiamondMark(filled: i < viewModel.engine.roundWins[player.rawValue], size: 8)
+                }
+                if active {
                     Circle()
-                        .fill(i < viewModel.engine.roundWins[player.rawValue]
-                              ? Palette.accent : .white.opacity(0.15))
-                        .frame(width: 9, height: 9)
+                        .fill(Theme.gold)
+                        .frame(width: 5, height: 5)
+                        .padding(.leading, 2)
                 }
             }
         }
-        .foregroundStyle(active ? Palette.accent : .white.opacity(0.65))
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(.white.opacity(active ? 0.13 : 0.05))
-                .overlay(RoundedRectangle(cornerRadius: 10)
-                    .stroke(active ? Palette.accent.opacity(0.7) : .clear, lineWidth: 1.5))
-        )
     }
 
     private var banner: some View {
         Text(viewModel.banner)
-            .font(.subheadline.weight(.medium))
-            .foregroundStyle(.white)
+            .font(.system(size: 14, weight: .medium))
+            .foregroundStyle(Theme.inkFaint)
             .multilineTextAlignment(.center)
-            .frame(maxWidth: .infinity, minHeight: 44)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 4)
-            .background(RoundedRectangle(cornerRadius: 10).fill(.white.opacity(0.08)))
+            .lineSpacing(3)
+            .frame(maxWidth: .infinity, minHeight: 40)
     }
 
     // MARK: 보드
@@ -128,7 +131,6 @@ struct GameView: View {
             let side = min(proxy.size.width, proxy.size.height)
             let cell = side / CGFloat(GameEngine.boardSize)
             ZStack(alignment: .topLeading) {
-                // 칸
                 ForEach(0..<GameEngine.cellCount, id: \.self) { index in
                     cellView(index, size: cell)
                         .frame(width: cell, height: cell)
@@ -136,12 +138,8 @@ struct GameView: View {
                                 y: CGFloat(index / GameEngine.boardSize) * cell)
                         .onTapGesture { viewModel.tapCell(index) }
                 }
-                // 말 — 위치 변화에 스프링 애니메이션
                 ForEach(pieceList, id: \.id) { piece in
-                    Text(piece.player.horseGlyph)
-                        .font(.system(size: cell * 0.62))
-                        .foregroundStyle(piece.player == .first ? Palette.firstPiece : Palette.secondPiece)
-                        .shadow(color: .black.opacity(0.4), radius: 1, y: 1)
+                    PieceToken(player: piece.player, size: cell * 0.82)
                         .frame(width: cell, height: cell)
                         .offset(x: CGFloat(piece.index % GameEngine.boardSize) * cell,
                                 y: CGFloat(piece.index / GameEngine.boardSize) * cell)
@@ -150,12 +148,16 @@ struct GameView: View {
                 }
             }
             .frame(width: side, height: side)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-            .overlay(RoundedRectangle(cornerRadius: 8)
-                .stroke(.black.opacity(0.35), lineWidth: 1.5))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .padding(8)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Theme.bgRaised)
+                    .shadow(color: .black.opacity(0.45), radius: 20, y: 10)
+            )
             .frame(maxWidth: .infinity)
         }
-        .aspectRatio(1, contentMode: .fit)
+        .aspectRatio(1.06, contentMode: .fit)
     }
 
     /// 말 목록 — 뷰모델이 유지하는 말 고유 ID로 identity를 고정해
@@ -174,42 +176,51 @@ struct GameView: View {
         let r = index / GameEngine.boardSize
         let c = index % GameEngine.boardSize
         let base: Color = switch terrain {
-        case .oasis: Palette.oasis
-        case .meadow: Palette.meadow
-        case .desert: (r + c) % 2 == 0 ? Palette.desert : Palette.desertAlt
+        case .oasis: Theme.oasisDeep
+        case .meadow: Theme.meadow
+        case .desert: (r + c) % 2 == 0 ? Theme.desert : Theme.desertAlt
         }
-        let isTarget = viewModel.targets.contains { $0.to == index }
         let targetKind = viewModel.targets.first { $0.to == index }?.kind
         let isLastMove = viewModel.lastMove.map { $0.from == index || $0.to == index } ?? false
 
         ZStack {
             Rectangle().fill(base)
+
             if terrain == .oasis {
+                // 오아시스: 잔잔한 파문
                 Circle()
-                    .fill(.white.opacity(0.35))
-                    .frame(width: size * 0.35, height: size * 0.35)
-                    .offset(y: -size * 0.08)
+                    .stroke(Color.white.opacity(0.30), lineWidth: 1)
+                    .frame(width: size * 0.62, height: size * 0.62)
+                Circle()
+                    .fill(Theme.oasis)
+                    .frame(width: size * 0.34, height: size * 0.34)
+                Circle()
+                    .fill(Color.white.opacity(0.45))
+                    .frame(width: size * 0.10, height: size * 0.10)
+                    .offset(x: -size * 0.05, y: -size * 0.07)
             }
             if isLastMove {
-                Rectangle().fill(.black.opacity(0.16))
+                Rectangle().fill(Theme.gold.opacity(0.16))
             }
             if viewModel.selection == index {
-                Rectangle().stroke(Palette.accent, lineWidth: 2.5)
+                RoundedRectangle(cornerRadius: 2)
+                    .stroke(Theme.gold, lineWidth: 2.5)
+                    .padding(1)
             }
-            if isTarget {
+            if let targetKind {
                 if targetKind == .slide {
                     Circle()
-                        .fill(Palette.oasis.opacity(0.9))
-                        .frame(width: size * 0.4, height: size * 0.4)
+                        .fill(Color.black.opacity(0.42))
+                        .frame(width: size * 0.30, height: size * 0.30)
                 } else {
                     Rectangle()
-                        .fill(Palette.oasis.opacity(0.9))
-                        .frame(width: size * 0.34, height: size * 0.34)
+                        .fill(Color.black.opacity(0.42))
+                        .frame(width: size * 0.26, height: size * 0.26)
                         .rotationEffect(.degrees(45))
                 }
             }
         }
-        .overlay(Rectangle().stroke(.black.opacity(0.12), lineWidth: 0.5))
+        .overlay(Rectangle().stroke(Theme.cellLine, lineWidth: 0.5))
     }
 
     // MARK: 하단 바
@@ -217,83 +228,176 @@ struct GameView: View {
     private var bottomBar: some View {
         HStack {
             if viewModel.showsMatchScore {
-                Button {
-                    showResignAlert = true
-                } label: {
-                    Label("기권", systemImage: "flag.fill")
-                        .font(.caption)
-                        .foregroundStyle(.white.opacity(0.6))
-                }
+                quietButton("기권") { showResignAlert = true }
             } else {
-                Button {
-                    dismiss()
-                } label: {
-                    Label("나가기", systemImage: "xmark")
-                        .font(.caption)
-                        .foregroundStyle(.white.opacity(0.6))
-                }
+                quietButton("나가기") { dismiss() }
             }
             Spacer()
             if viewModel.isSolo {
                 Button {
                     viewModel.undo()
                 } label: {
-                    Label("무르기", systemImage: "arrow.uturn.backward")
-                        .font(.caption)
-                        .foregroundStyle(viewModel.canUndo ? Palette.accent : .white.opacity(0.3))
+                    Text("무르기")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(viewModel.canUndo ? Theme.ink : Theme.inkGhost)
                 }
                 .disabled(!viewModel.canUndo)
             }
+        }
+        .padding(.top, 10)
+        .overlay(alignment: .top) {
+            Rectangle().fill(Theme.hairline).frame(height: 1)
+        }
+    }
+
+    private func quietButton(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Theme.inkFaint)
         }
     }
 
     // MARK: 오버레이
 
-    @ViewBuilder
-    private func overlayView(_ overlay: GameViewModel.Overlay) -> some View {
-        let content: (title: String, subtitle: String, button: String, action: () -> Void, secondary: Bool)
-        = switch overlay {
-        case .roundWon(let mine, let round):
-            (mine ? "🏁 \(round)라운드 승리!" : "😮 \(round)라운드 패배",
-             "오아시스 도착! 라운드 점수 \(viewModel.engine.roundWins[0]) : \(viewModel.engine.roundWins[1])",
-             "다음 라운드", { viewModel.startNextRound() }, false)
-        case .matchWon(let mine):
-            (mine ? "🏆 매치 승리!" : "💀 매치 패배",
-             "최종 \(viewModel.engine.roundWins[0]) : \(viewModel.engine.roundWins[1])",
-             "나가기", { dismiss() }, false)
-        case .tutorialStepDone(let last):
-            last ? ("🎓 튜토리얼 완료!", "이제 실전에서 만나요.", "완료", { dismiss() }, false)
-                 : ("잘했어요!", "다음 단계로 넘어갑니다.", "다음 단계", { viewModel.advanceTutorial() }, false)
-        case .tutorialRetry:
-            ("다시 해볼까요?", "목표와 다르게 움직였어요.", "다시 시도", { viewModel.advanceTutorial() }, false)
-        case .puzzleSolved(let last):
-            last ? ("🎉 퍼즐 성공!", "모든 퍼즐을 풀었습니다!", "목록으로", { dismiss() }, false)
-                 : ("🎉 퍼즐 성공!", "", onNextPuzzle != nil ? "다음 퍼즐" : "목록으로",
-                    { if let onNextPuzzle { onNextPuzzle() } else { dismiss() } }, false)
-        case .puzzleFailed(let reason):
-            ("아쉬워요", reason, "다시 시도", { viewModel.retryPuzzle() }, true)
-        }
+    private struct OverlayContent {
+        var headline: String
+        var accent: Bool = false        // 골드 강조 (승리)
+        var subtitle = ""
+        var button: String
+        var action: () -> Void
+        var secondaryButton: String?
+        var secondaryAction: (() -> Void)?
+    }
 
-        VStack(spacing: 16) {
-            Text(content.title).font(.largeTitle.bold())
-            if !content.subtitle.isEmpty {
-                Text(content.subtitle)
-                    .font(.subheadline)
-                    .multilineTextAlignment(.center)
+    private var overlayContent: OverlayContent? {
+        guard let overlay = viewModel.overlay else { return nil }
+        let wins = viewModel.engine.roundWins
+        switch overlay {
+        case .roundWon(let mine, let round):
+            return OverlayContent(
+                headline: mine ? "\(round)라운드 승리" : "\(round)라운드 패배",
+                accent: mine,
+                subtitle: "오아시스 도착 — 라운드 점수 \(wins[0]) : \(wins[1])",
+                button: "다음 라운드",
+                action: { viewModel.startNextRound() }
+            )
+        case .matchWon(let mine):
+            return OverlayContent(
+                headline: mine ? "승리" : "패배",
+                accent: mine,
+                subtitle: "최종 라운드 점수 \(wins[0]) : \(wins[1])",
+                button: "나가기",
+                action: { dismiss() }
+            )
+        case .tutorialStepDone(let last):
+            if last {
+                return OverlayContent(
+                    headline: "튜토리얼 완료",
+                    accent: true,
+                    subtitle: "행마법을 모두 익혔습니다. 이제 실전에서 만나요.",
+                    button: "완료",
+                    action: { dismiss() }
+                )
             }
-            Button(content.button, action: content.action)
-                .buttonStyle(.borderedProminent)
-                .tint(Palette.accent)
-                .foregroundStyle(.black)
-            if content.secondary {
-                Button("나가기") { dismiss() }
-                    .font(.caption)
-                    .foregroundStyle(.white.opacity(0.6))
+            return OverlayContent(
+                headline: "잘했어요",
+                accent: true,
+                subtitle: "다음 단계로 넘어갑니다.",
+                button: "다음 단계",
+                action: { viewModel.advanceTutorial() }
+            )
+        case .tutorialRetry:
+            return OverlayContent(
+                headline: "다시 해볼까요?",
+                subtitle: "목표와 다르게 움직였어요.",
+                button: "다시 시도",
+                action: { viewModel.advanceTutorial() }
+            )
+        case .puzzleSolved(let last):
+            if last {
+                return OverlayContent(
+                    headline: "퍼즐 성공",
+                    accent: true,
+                    subtitle: "모든 퍼즐을 풀었습니다.",
+                    button: "목록으로",
+                    action: { dismiss() }
+                )
+            }
+            return OverlayContent(
+                headline: "퍼즐 성공",
+                accent: true,
+                button: onNextPuzzle != nil ? "다음 퍼즐" : "목록으로",
+                action: { [onNextPuzzle] in
+                    if let onNextPuzzle { onNextPuzzle() } else { dismiss() }
+                }
+            )
+        case .puzzleFailed(let reason):
+            return OverlayContent(
+                headline: "아쉬워요",
+                subtitle: reason,
+                button: "다시 시도",
+                action: { viewModel.retryPuzzle() },
+                secondaryButton: "나가기",
+                secondaryAction: { dismiss() }
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var overlayView: some View {
+        if let content = overlayContent {
+            ZStack {
+                Color.black.opacity(0.55).ignoresSafeArea()
+
+                VStack(spacing: 0) {
+                    Rectangle()
+                        .fill(content.accent ? Theme.gold : Theme.hairline)
+                        .frame(width: 44, height: 3)
+                        .padding(.bottom, 18)
+
+                    Text(content.headline)
+                        .font(.system(size: 30, weight: .black))
+                        .foregroundStyle(Theme.ink)
+
+                    if !content.subtitle.isEmpty {
+                        Text(content.subtitle)
+                            .font(.system(size: 14))
+                            .foregroundStyle(Theme.inkFaint)
+                            .multilineTextAlignment(.center)
+                            .lineSpacing(3)
+                            .padding(.top, 10)
+                    }
+
+                    Button(action: content.action) {
+                        Text(content.button)
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(Theme.bg)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 50)
+                            .background(RoundedRectangle(cornerRadius: 12).fill(Theme.gold))
+                    }
+                    .padding(.top, 24)
+
+                    if let secondary = content.secondaryButton,
+                       let secondaryAction = content.secondaryAction {
+                        Button(action: secondaryAction) {
+                            Text(secondary)
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(Theme.inkFaint)
+                        }
+                        .padding(.top, 14)
+                    }
+                }
+                .padding(28)
+                .frame(maxWidth: 320)
+                .background(
+                    RoundedRectangle(cornerRadius: 22)
+                        .fill(Theme.bgRaised)
+                        .overlay(RoundedRectangle(cornerRadius: 22).stroke(Theme.hairline, lineWidth: 1))
+                        .shadow(color: .black.opacity(0.5), radius: 30, y: 12)
+                )
             }
         }
-        .foregroundStyle(.white)
-        .padding(28)
-        .background(RoundedRectangle(cornerRadius: 20).fill(.black.opacity(0.85)))
-        .padding(40)
     }
 }
