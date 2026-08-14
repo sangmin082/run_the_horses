@@ -3,7 +3,10 @@ import SwiftUI
 /// 대국 화면 — 11×11 보드, 라운드 점수, 안내.
 /// 1인용/온라인/튜토리얼/퍼즐 모두 이 화면을 사용한다.
 struct GameView: View {
-    @State var viewModel: GameViewModel
+    // @State가 아니라 @Bindable이어야 한다 — @State는 뷰가 같은 자리에서 다시
+    // 그려질 때 초기값을 무시하고 이전 뷰모델을 유지해서, 퍼즐 전환 시
+    // 이전 퍼즐(성공 오버레이)이 계속 남는 버그가 된다.
+    @Bindable var viewModel: GameViewModel
     /// 퍼즐 모드: "다음 퍼즐" 버튼이 눌리면 부모가 다음 퍼즐로 교체한다
     var onNextPuzzle: (() -> Void)?
     @Environment(\.dismiss) private var dismiss

@@ -52,6 +52,7 @@ struct PuzzlesView: View {
                         game = nil
                     }
                 })
+                .id(gameModel.id) // 퍼즐 교체 시 뷰 identity를 새 뷰모델에 묶는다
             }
         }
         .preferredColorScheme(.dark)
